@@ -1,55 +1,68 @@
-import Bf.Basic
+import Bf.Config
+import Bf.Verdict
 
-inductive Verdict where
-  | halts | nonhalts | unknown
-  deriving DecidableEq, Repr
+namespace Bf
 
-instance : ToString Verdict where
-  toString
-    | .halts    => "halts"
-    | .nonhalts => "nonhalts"
-    | .unknown  => "unknown"
+def Verdict.Correct : Verdict → Program → Prop
+  | .halts n,  p => p.init.HaltsIn n
+  | .nonhalts, p => ¬ p.init.Halts
+  | .unknown,  _ => True
 
 @[ext] structure Decider where
-  run      : Program → Verdict
-  sound_h  : ∀ p, run p = .halts → p.toMachine.halts
-  sound_nh : ∀ p, run p = .nonhalts → ¬ p.toMachine.halts
+  run   : Program → Verdict
+  sound : ∀ p : Program, (run p).Correct p
 
-def Decider.orElse (d₁ d₂ : Decider) : Decider where
-  run p := match d₁.run p with
+namespace Decider
+
+def unknown : Decider where
+  run := fun (_ : Program) => .unknown
+  sound := fun (_ : Program) => trivial
+
+def orElse (d₁ d₂ : Decider) : Decider where
+  run := fun (p : Program) => match d₁.run p with
     | .unknown => d₂.run p
     | v        => v
-  sound_h p h := by
-    cases h₁ : d₁.run p <;> simp only [h₁, reduceCtorEq] at h
-    case halts   => exact d₁.sound_h p h₁
-    case unknown => exact d₂.sound_h p h
-  sound_nh p h := by
-    cases h₁ : d₁.run p <;> simp only [h₁, reduceCtorEq] at h
-    case nonhalts => exact d₁.sound_nh p h₁
-    case unknown  => exact d₂.sound_nh p h
+  sound := fun (p : Program) => by
+    have h₁ := d₁.sound p
+    cases hv : d₁.run p <;> simp only [hv] at h₁ ⊢ <;> first | exact h₁ | exact d₂.sound p
 
-instance : OrElse Decider := ⟨fun d₁ d₂ => d₁.orElse (d₂ ())⟩
+instance : OrElse Decider := ⟨fun (d₁ : Decider) (d₂ : Unit → Decider) => d₁.orElse (d₂ ())⟩
 
-def Decider.unknown : Decider where
-  run _ := .unknown
-  sound_h _ h := nomatch h
-  sound_nh _ h := nomatch h
+theorem unknown_orElse (d : Decider) : unknown.orElse d = d := rfl
 
-theorem Decider.unknown_orElse (d : Decider) : Decider.unknown.orElse d = d := by
-  ext p; rfl
-
-theorem Decider.orElse_unknown (d : Decider) : d.orElse .unknown = d := by
+theorem orElse_unknown (d : Decider) : d.orElse unknown = d := by
   ext p; simp only [orElse, unknown]; split <;> simp_all
 
-theorem Decider.orElse_assoc (a b c : Decider) :
-    (a.orElse b).orElse c = a.orElse (b.orElse c) := by
+theorem orElse_assoc (a b c : Decider) : (a.orElse b).orElse c = a.orElse (b.orElse c) := by
   ext p; simp only [orElse]; cases a.run p <;> rfl
 
-def Decider.any (ds : List Decider) : Decider :=
-  ds.foldr Decider.orElse .unknown
+def any (ds : List Decider) : Decider := ds.foldr orElse unknown
 
-def Decider.undecided (d : Decider) (ps : List Program) : List Program :=
-  ps.filter fun p => d.run p = .unknown
+def summary (d : Decider) (ps : List Program) : Verdict := Verdict.summary (ps.map d.run)
 
-def Decider.label (d : Decider) (ps : List Program) : List (Program × Verdict) :=
-  ps.map fun p => (p, d.run p)
+theorem summary_halts {d : Decider} {ps : List Program} {s : Nat} (h : d.summary ps = .halts s) :
+    (∃ p ∈ ps, p.init.HaltsIn s) ∧ ∀ p ∈ ps, ∀ k : Nat, p.init.HaltsIn k → k ≤ s := by
+  unfold summary at h
+  constructor
+  · rcases Verdict.summary_eq_nonhalts_or_mem (ps.map d.run) with e | e
+    · rw [h] at e; cases e
+    · rw [h] at e
+      obtain ⟨p, hp, hrun⟩ := List.mem_map.mp e
+      have hsound := d.sound p
+      rw [hrun] at hsound
+      exact ⟨p, hp, hsound⟩
+  · intro p hp k hk
+    have hmem : d.run p ∈ ps.map d.run := List.mem_map.mpr ⟨p, hp, rfl⟩
+    have hle := Verdict.sup_summary_of_mem hmem
+    rw [h] at hle
+    have hsound := d.sound p
+    rcases Verdict.of_sup_halts hle with e | ⟨j, hj, e⟩
+    · rw [e] at hsound
+      exact absurd ⟨k, hk⟩ hsound
+    · rw [e] at hsound
+      rw [hk.unique hsound]
+      exact hj
+
+end Decider
+
+end Bf

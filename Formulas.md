@@ -1,81 +1,212 @@
 # Формулы
 
-## Машина
+## Программа и конфигурация
 
-Программы $P$ — термы грамматики
+Программы $P$ — термы грамматики:
 
 $$
 P ::= \varepsilon \mid {<}P \mid {>}P \mid {*}P \mid [P]\,P
 $$
 
-Машина $m = (t, p)$: лента $t$ и оставшаяся программа $p$.
-Начальная машина программы $p$: $\mathrm{init}(p) = (\mathrm{blank}, p)$.
+Размер — число символов: $|\varepsilon| = 0$, $|{<}p| = |{>}p| = |{*}p| = |p| + 1$, $|[b]\,p| = |b| + |p| + 2$.
 
-Шаг:
+Лента $t : \mathbb{Z} \to \{0, 1\}$, головка всегда в ячейке $0$.
+Конфигурация $c = (t, p)$: лента и остаток программы. $\mathrm{init}(p) = (\mathrm{blank}, p)$.
+
+## Шаг
+
+$\mathrm{step} : \mathrm{Config} \to \mathrm{Option}\ \mathrm{Config}$, остановка — $\mathrm{none}$:
 
 $$
 \begin{aligned}
-\mathrm{step}(t, \varepsilon) &= (t, \varepsilon) \\
+\mathrm{step}(t, \varepsilon) &= \mathrm{none} \\
 \mathrm{step}(t, {<}p) &= (\mathrm{moveL}\,t,\ p) \\
 \mathrm{step}(t, {>}p) &= (\mathrm{moveR}\,t,\ p) \\
 \mathrm{step}(t, {*}p) &= (\mathrm{flip}\,t,\ p) \\
 \mathrm{step}(t, [b]\,p) &=
   \begin{cases}
-    (t,\ b \mathbin{+\!\!+} [b]\,p) & \text{если } t.\mathrm{head} = 1 \\
+    (t,\ b \mathbin{+\!\!+} [b]\,p) & \text{если } t(0) = 1 \\
     (t,\ p) & \text{иначе}
   \end{cases}
 \end{aligned}
 $$
 
-$\mathrm{run}_n = \mathrm{step}^n$.
+$\mathrm{steps}_n$ — $n$ шагов подряд; $\mathrm{none}$, если остановка случилась раньше.
 
 ## Остановка
 
 $$
 \begin{aligned}
-\mathrm{halted}(m) &\iff m.\mathrm{program} = \varepsilon \\
-\mathrm{halts}(m) &\iff \exists n,\ \mathrm{halted}(\mathrm{run}_n\, m) \\
-\mathrm{haltsIn}(m, k) &\iff \mathrm{halted}(\mathrm{run}_k\, m) \land \forall j < k,\ \lnot\,\mathrm{halted}(\mathrm{run}_j\, m)
+\mathrm{HaltsIn}(c, n) &\iff \exists c',\ \mathrm{steps}_n(c) = c' \land \mathrm{step}(c') = \mathrm{none} \\
+\mathrm{Halts}(c) &\iff \exists n,\ \mathrm{HaltsIn}(c, n)
 \end{aligned}
 $$
 
+Время остановки единственно: $\mathrm{HaltsIn}(c, n) \land \mathrm{HaltsIn}(c, m) \to n = m$.
+
 ## Busy Beaver
 
-$E_n$ — все программы длины $n$ (`Program.enumerate n`).
-
 $$
-\mathrm{BB}(n) = s \iff
-\big(\exists p \in E_n,\ \mathrm{haltsIn}(\mathrm{init}\,p, s)\big) \land
-\big(\forall p \in E_n,\ \forall k,\ \mathrm{haltsIn}(\mathrm{init}\,p, k) \to k \le s\big)
-$$
-
-## Децайдеры
-
-Децайдер $d : \mathrm{Machine} \to \{\mathrm{halts}, \mathrm{nonhalts}, \mathrm{unknown}\}$ с условиями корректности:
-
-$$
-d(m) = \mathrm{halts} \to \mathrm{halts}(m), \qquad
-d(m) = \mathrm{nonhalts} \to \lnot\,\mathrm{halts}(m)
+\begin{aligned}
+\mathrm{Reachable}(n, k) &\iff \exists p,\ |p| = n \land \mathrm{HaltsIn}(\mathrm{init}\,p, k) \\
+\mathrm{IsBB}(n, s) &\iff \mathrm{Reachable}(n, s) \land \forall k,\ \mathrm{Reachable}(n, k) \to k \le s
+\end{aligned}
 $$
 
-Моноид $(\mathrm{Decider},\ {<|>},\ \mathbf{0})$, где $\mathbf{0}(m) = \mathrm{unknown}$:
+## Вердикты и децайдеры
+
+$\mathrm{Verdict} ::= \mathrm{halts}(n) \mid \mathrm{nonhalts} \mid \mathrm{unknown}$.
+
+Децайдер $d : \mathrm{Program} \to \mathrm{Verdict}$ с условием корректности:
 
 $$
-(d_1 <|> d_2)(m) =
+d(p) = \mathrm{halts}(n) \to \mathrm{HaltsIn}(\mathrm{init}\,p, n), \qquad
+d(p) = \mathrm{nonhalts} \to \lnot\,\mathrm{Halts}(\mathrm{init}\,p)
+$$
+
+**Моноид на децайдерах** $({<|>},\ \mathrm{unknown})$ — первый определённый ответ:
+
+$$
+(d_1 <|> d_2)(p) =
 \begin{cases}
-  d_2(m) & \text{если } d_1(m) = \mathrm{unknown} \\
-  d_1(m) & \text{иначе}
+  d_2(p) & \text{если } d_1(p) = \mathrm{unknown} \\
+  d_1(p) & \text{иначе}
 \end{cases}
 $$
 
+**Моноид на результатах** $(\sqcup,\ \mathrm{nonhalts})$ — максимум в порядке
+$\mathrm{nonhalts} < \mathrm{halts}(0) < \mathrm{halts}(1) < \dots < \mathrm{unknown}$:
+
 $$
-\mathbf{0} <|> d = d, \qquad d <|> \mathbf{0} = d, \qquad
-(a <|> b) <|> c = a <|> (b <|> c)
+\mathrm{unknown} \sqcup v = \mathrm{unknown}, \qquad
+\mathrm{nonhalts} \sqcup v = v, \qquad
+\mathrm{halts}(a) \sqcup \mathrm{halts}(b) = \mathrm{halts}(\max(a, b))
 $$
+
+## Одинаковое время
+
+$$
+p \approx q \iff \forall k,\ \mathrm{HaltsIn}(\mathrm{init}\,p, k) \leftrightarrow \mathrm{HaltsIn}(\mathrm{init}\,q, k)
+$$
+
+Это отношение эквивалентности (`Program.SameTime`). На нём стоят и генератор, и канонизатор.
+
+## Сертификат
+
+Сертификат `Certificate n s` — это само доказательство $\mathrm{BB}(n) = s$. Он состоит из четырёх частей и проверки:
+
+| поле | что это | что доказано |
+|---|---|---|
+| `generator` | $G : \mathbb{N} \to \mathrm{List\ Program}$ | $q \in G_n \to \lvert q\rvert = n$; $\ \forall p\ \exists q \in G_{\lvert p\rvert},\ p \approx q$ |
+| `canon` | $c : \mathrm{Program} \to \mathrm{Program}$ | $\lvert c(p)\rvert = \lvert p\rvert$; $\ p \approx c(p)$ |
+| `decider` | $d : \mathrm{Program} \to \mathrm{Verdict}$ | вердикт верен |
+| `manual` | список $(p, v, \text{доказательство})$ | вердикт $v$ верен для $p$ |
+| `check` | доказательство равенства | $\bigsqcup_{a \in R_n} d'(a) = \mathrm{halts}(s)$ |
+
+Представители: $R_n = \{c(q) : q \in G_n\}$ без повторов.
+Полный децайдер $d'$: сначала $d$, а где он ответил $\mathrm{unknown}$ — поиск в `manual`.
+
+**Главная теорема** (`Certificate.isBB`): из любого сертификата `Certificate n s` следует $\mathrm{IsBB}(n, s)$.
+
+Сейчас есть один генератор, тривиальный: $G_n$ — все программы размера $n$ (`Generator.trivial`).
+
+**Техника доказательств.** Отношение $R$ на конфигурациях — *симуляция*, если из $R(c, d)$ следует:
+обе остановились, либо за одно и то же $k > 0$ шагов обе приходят в $c', d'$ с $R(c', d')$.
+Тогда $R(c, d) \to (\mathrm{HaltsIn}(c, n) \leftrightarrow \mathrm{HaltsIn}(d, n))$ (`Simulation.haltsIn_iff`).
+Все канонизаторы доказаны так.
+Множество $S$ конфигураций — *прогресс*, если из каждой $c \in S$ за $k > 0$ шагов снова попадаем в $S$;
+тогда ни одна $c \in S$ не останавливается (`Progress.not_halts`). Так доказаны циклер со сдвигом и ручные доказательства.
+
+## Классы эквивалентности
+
+Синтаксическое отношение: $\mathrm{canon} : \mathrm{Program} \to \mathrm{Program}$ вычисляет представителя класса,
+
+$$
+p \sim q \iff \mathrm{canon}(p) = \mathrm{canon}(q).
+$$
+
+Само определение ничего не говорит о длине и времени — это доказывается про $\mathrm{canon}$.
+
+**Теоремы о $\mathrm{canon}$** (условие корректности, `Canon` в коде):
+
+$$
+|\mathrm{canon}(p)| = |p|, \qquad
+\mathrm{HaltsIn}(\mathrm{init}\,p, n) \leftrightarrow \mathrm{HaltsIn}(\mathrm{init}\,(\mathrm{canon}\,p), n)
+$$
+
+Правила компонуются (сначала одно, потом другое) и вместе с тождественным образуют моноид.
+
+Идемпотентность, $\mathrm{canon}(\mathrm{canon}\,p) = \mathrm{canon}(p)$, для теоремы не нужна и не доказана (проверена перебором до $n = 8$).
+
+**Определения.**
+
+- *Прямой участок* — максимальная последовательность из `<`, `>`, `*` на одном уровне программы (до ближайшей `[` или `]`).
+- *Эффект* участка $s$: $\mathrm{eff}(s) = (d, F)$, где $d \in \mathbb{Z}$ — смещение головки, $F \subset \mathbb{Z}$ — ячейки, перевёрнутые нечётное число раз. После $|s|$ шагов лента и головка зависят только от $\mathrm{eff}(s)$.
+- *Мёртвый цикл* — цикл, стоящий в самом начале программы (лента пустая) или сразу после `]` на том же уровне (в ячейке $0$). Он всегда пропускается за один шаг. Остальные циклы — *живые*; цикл в начале тела живого цикла живой.
+
+**Правила** ($\mathrm{norm}$ — один проход по программе):
+
+1. **Прямой участок** $s$ заменяется каноническим участком той же длины с тем же эффектом:
+   $|s| = |s'| \land \mathrm{eff}(s) = \mathrm{eff}(s') \ \Rightarrow\ s \sim s'$. Пример: `**` $\sim$ `<>` $\sim$ `><`, `*>*<` $\sim$ `>*<*`.
+2. **Первый участок** программы (в том числе после мёртвых циклов в её начале) — с точностью до сдвига: важны только длина и $F - d$, рисунок единиц относительно головки. Пример: `><*` $\sim$ `>>*` $\sim$ `<<*` $\sim$ `***`.
+3. **Последний участок** программы верхнего уровня: важна только длина, $s \mapsto {*}^{|s|}$.
+4. **Цепочка мёртвых циклов** $[c_1][c_2]\dots[c_k]$ (максимальная) заменяется на $[{*}^{S}]\,[\,]\dots[\,]$ из $k$ циклов, $S = \sum |c_i|$. Сохраняются число циклов (время) и общий размер. Внутрь мёртвых тел $\mathrm{norm}$ не заходит.
+5. **Живой цикл** $[b]$: тело нормализуется рекурсивно, $[\mathrm{norm}\,b]$.
+
+**Зеркало.** $\mathrm{mirror}$ меняет местами `<` и `>`; время остановки не меняется.
+Правило (`Canon.mirror`): если первая команда сдвига в программе — `>`, программа отражается.
+Стоит последним: $\mathrm{canon} = \mathrm{mirror\text{-}rule} \circ \mathrm{norm}$.
+
+Канонический участок в правилах 1–2 — лексикографически первый при порядке `*` < `<` < `>`.
+
+**Число представителей.** Все программы без циклов длины $n$ — один класс ${*}^n$.
+
+| $n$ | 6 | 8 | 9 | 10 | 12 | 13 |
+|---|---|---|---|---|---|---|
+| программ | 2 219 | 39 587 | 171 369 | 751 236 | 14 878 455 | 67 030 785 |
+| классов без зеркала | 210 | 2 843 | 10 817 | 41 706 | 636 363 | 2 511 471 |
+| классов с зеркалом (старый $\min$) | 134 | 1 587 | 5 810 | 21 833 | ≈ 318 000 | ≈ 1 256 000 |
+| классов с зеркалом (сейчас) | 161 | 2 057 | 7 716 | | | |
+
+До $n = 10$ посчитано полным перебором; для $n \ge 12$ число с зеркалом — оценка (половина предыдущей строки, настоящее чуть больше).
 
 ## Результаты
 
-$$
-\forall p \in E_0,\ \mathrm{halts}(\mathrm{init}\,p), \qquad
-\forall p \in E_1,\ \mathrm{halts}(\mathrm{init}\,p)
-$$
+| $n$ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| $\mathrm{BB}(n)$ | 0 | 1 | 2 | 3 | 4 | 5 | 8 | 10 | 14 | 18 | 30 | 35 |
+
+Все значения — сертификаты `bb0 … bb11` в `Results.lean`, у каждого свой минимальный набор децайдеров. Главная теорема `Certificate.isBB` доказана обычным образом, а поле `check` каждого сертификата проверено через `native_decide` (скомпилированное вычисление; кроме стандартных аксиом, теорема опирается на аксиому `native_decide`, то есть на доверие компилятору Lean). Проверка всех сертификатов — около 20 секунд.
+Руками решены (`Bf/Solved/`):
+- $n = 9$: баунсер `*[<*[>]*]` (`Bouncer.lean`);
+- $n = 10$: `*[<*[>>]*]`, `*[<<*[>]*]` (`JumpBouncer.lean`, `StepBouncer.lean`);
+- $n = 11$: 12 баунсеров одной общей теоремой `Block.Shape` (`Bouncers11.lean`): проход «вырасти слева — прогон вправо — вырасти справа — прогон влево», для каждой программы только 4 шага, проверяемые тактикой `blk_tac`; бегущая дырка `*[<[>]*<*>]` (`HoleBouncer.lean`); `*[<<*[>>]*]` — растянутый в 2 раза баунсер `*[<*[>]*]` (`Dilated.lean`, общая лемма `Program.not_halts_dilate`).
+
+Децайдер сведения `Decider.reduce` (`Deciders/Reduce.lean`): если после нескольких шагов лента снова пустая, а оставшаяся программа или её зеркало начинается с уже доказанной бесконечной, то и исходная не останавливается.
+
+## Структура кода
+
+| файл | что в нём |
+|---|---|
+| `Tape`, `Program` | лента; синтаксис программ |
+| `Config` | семантика: шаг, остановка, $\approx$ |
+| `Simulation` | симуляция и прогресс |
+| `Mirror` | зеркало программы, ленты, конфигурации |
+| `BB`, `Verdict` | $\mathrm{IsBB}$; вердикты и их моноид |
+| `Generator`, `Generators/` | структура и конкретные генераторы |
+| `Canon`, `Canons/` | структура и правила канонизации |
+| `Decider`, `Deciders/` | структура и конкретные децайдеры |
+| `Solved`, `Solved/` | ручные доказательства |
+| `Certificate` | сертификат и главная теорема |
+| `Results` | $\mathrm{BB}(0..4)$ |
+
+## Идеи на потом
+
+Расширения класса эквивалентности (та же длина, то же время), пока не берём:
+
+- **Известные значения ячеек.** Вести вдоль программы частичное знание о ленте: в начале программы известна вся лента, после `]` в ячейке $0$, в начале тела живого цикла в ячейке $1$. Цикл на известном нуле мёртвый: `*>[c]`, `[a]<>[c]`, `[*[c]…]`.
+- **Код после заведомо бесконечного цикла.** Если по известным значениям в цикл точно войдут и он не кончится (`*[]…`, `*[<>]…`), всё после него заменяется на `*ᵏ`.
+
+Зеркало сейчас склеивает хуже, чем могло бы:
+
+- **Симметричный $\mathrm{norm}$.** Правило «первый сдвиг налево» склеивает $p$ и $\mathrm{mirror}\,p$, только если $\mathrm{norm}(\mathrm{mirror}\,p) = \mathrm{mirror}(\mathrm{norm}\,p)$. Мёртвые циклы и последний участок симметричны, а прямые участки и первый участок — нет: при порядке `*` < `<` < `>` канонический участок длины 3 со смещением $+1$ — `<>>`, а со смещением $-1$ — `<<>`, это не зеркала. Из-за этого классов при $n = 9$ 7716, а не 5810, как было с $\mathrm{canon}(p) = \min(\mathrm{norm}\,p,\ \mathrm{norm}(\mathrm{mirror}\,p))$. Починка: порядок относительно итогового смещения участка, `*` < «шаг по ходу» < «шаг против хода». Для участков с нулевым смещением полной симметрии может не быть (самозеркальной формы нет).

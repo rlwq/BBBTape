@@ -1,20 +1,37 @@
 import Bf.Decider
 
-def deciderSimulator (n : Nat) (m : Machine) : Bool :=
-  decide (m.run n).halted
+namespace Bf
 
-theorem deciderSimulator_correct (n : Nat) (m : Machine) :
-    deciderSimulator n m = true → m.halts := by
-  intro h
-  exists n
-  unfold deciderSimulator at h
-  exact of_decide_eq_true h
+def Config.haltTime : Nat → Config → Option Nat
+  | fuel, c => match c.step, fuel with
+    | none,    _     => some 0
+    | some _,  0     => none
+    | some c', f + 1 => (haltTime f c').map (· + 1)
 
-def simulator (n : Nat) : Decider where
-  run p := if deciderSimulator n p.toMachine then .halts else .unknown
-  sound_h p h := by
-    by_cases hs : deciderSimulator n p.toMachine = true
-    · exact deciderSimulator_correct n p.toMachine hs
-    · simp [hs] at h
-  sound_nh p h := by
-    by_cases hs : deciderSimulator n p.toMachine = true <;> simp [hs] at h
+theorem Config.haltsIn_of_haltTime {fuel : Nat} {c : Config} {n : Nat}
+    (h : haltTime fuel c = some n) : c.HaltsIn n := by
+  induction fuel generalizing c n with
+  | zero =>
+    unfold haltTime at h
+    cases hs : c.step with
+    | none => simp [hs] at h; subst h; exact ⟨c, rfl, hs⟩
+    | some c' => simp [hs] at h
+  | succ f ih =>
+    unfold haltTime at h
+    cases hs : c.step with
+    | none => simp [hs] at h; subst h; exact ⟨c, rfl, hs⟩
+    | some c' =>
+      simp [hs] at h
+      obtain ⟨k, hk, rfl⟩ := h
+      exact (haltsIn_succ hs).mpr (ih hk)
+
+def Decider.simulator (fuel : Nat) : Decider where
+  run := fun (p : Program) => match p.init.haltTime fuel with
+    | some n => .halts n
+    | none   => .unknown
+  sound := fun (p : Program) => by
+    cases h : p.init.haltTime fuel with
+    | some n => exact Config.haltsIn_of_haltTime h
+    | none   => trivial
+
+end Bf

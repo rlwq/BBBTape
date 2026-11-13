@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Песочница &lt;&gt;*[]</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --border: #d9d9de;
+  --one: #2f5bd3; --zero: #ffffff; --head: #e8590c; --pc: #ffd43b; --pc-text: #1d1d1f;
+  --ok: #2b8a3e; --bad: #c92a2a; --btn: #eef0f4; --btn-hover: #e1e4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161618; --panel: #1f1f22; --text: #ececf0; --muted: #9a9aa3; --border: #34343a;
+    --one: #6f93ff; --zero: #26262a; --head: #ff8c42; --pc: #e0b100; --pc-text: #111;
+    --ok: #51cf66; --bad: #ff6b6b; --btn: #2a2a2f; --btn-hover: #35353b;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161618; --panel: #1f1f22; --text: #ececf0; --muted: #9a9aa3; --border: #34343a;
+  --one: #6f93ff; --zero: #26262a; --head: #ff8c42; --pc: #e0b100; --pc-text: #111;
+  --ok: #51cf66; --bad: #ff6b6b; --btn: #2a2a2f; --btn-hover: #35353b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; margin-bottom: 14px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  margin: 0 0 10px; font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+input[type=text] { flex: 1 1 220px; min-width: 0; font: 18px/1 ui-monospace, Menlo, monospace;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text); }
+select, button { font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--btn); color: var(--text); cursor: pointer; }
+button:hover { background: var(--btn-hover); }
+button:disabled { opacity: .45; cursor: default; }
+.err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 6px; }
+#code { font: 26px/1.3 ui-monospace, Menlo, monospace; letter-spacing: 2px;
+  word-break: break-all; min-height: 36px; }
+#code span { padding: 0 2px; border-radius: 4px; }
+#code span.pc { background: var(--pc); color: var(--pc-text); }
+#code .end { color: var(--muted); font-size: 16px; }
+#code .end.pc { color: var(--pc-text); }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; font-size: 14px; }
+.stats b { font-variant-numeric: tabular-nums; }
+.status-halt { color: var(--ok); font-weight: 600; }
+.status-run { color: var(--muted); }
+#tapeWrap { overflow: hidden; }
+#tape { display: flex; justify-content: center; gap: 3px; padding-top: 22px; position: relative; }
+.cell { flex: 0 0 26px; height: 34px; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--zero); display: flex; align-items: center; justify-content: center;
+  font: 13px ui-monospace, Menlo, monospace; color: var(--muted); position: relative; cursor: pointer; }
+.cell.one { background: var(--one); border-color: var(--one); color: #fff; }
+.cell.head { outline: 3px solid var(--head); outline-offset: 1px; }
+.cell.head::before { content: "▼"; position: absolute; top: -22px; color: var(--head); font-size: 14px; }
+.cell .idx { position: absolute; bottom: -18px; font-size: 10px; color: var(--muted); }
+#tape { padding-bottom: 18px; }
+.hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+#stWrap { max-height: 460px; overflow: auto; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--zero); }
+#st { display: block; margin: 0 auto; image-rendering: pixelated; }
+label.inline { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+input[type=range] { width: 140px; }
+input[type=number] { width: 110px; font: inherit; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Песочница &lt;&gt;*[]</h1>
+  <p class="sub">Семантика как в Lean: двусторонняя лента, один шаг на каждую команду
+    <kbd>&lt;</kbd> <kbd>&gt;</kbd> <kbd>*</kbd> и на каждую проверку <kbd>[</kbd>;
+    <kbd>]</kbd> возвращает к своей <kbd>[</kbd> бесплатно.</p>
+
+  <section>
+    <h2>Программа</h2>
+    <div class="row">
+      <input id="src" type="text" value="*[[<]>>*]" spellcheck="false" autocomplete="off">
+      <select id="examples">
+        <option value="">примеры…</option>
+        <option value="*[[<]>>*]">*[[&lt;]&gt;&gt;*] — чемпион n=9 (18 шагов)</option>
+        <option value="*[<*[>]*]">*[&lt;*[&gt;]*] — баунсер n=9 (не останавливается)</option>
+        <option value="*[[<]*>]">*[[&lt;]*&gt;] — n=8, едет со сдвигом</option>
+        <option value="*[*]">*[*] — останавливается</option>
+        <option value="*[]">*[] — цикл на месте</option>
+        <option value="*[>*]">*[&gt;*] — едет вправо</option>
+        <option value="*[<*]">*[&lt;*] — едет влево</option>
+      </select>
+    </div>
+    <div class="err" id="err"></div>
+    <div id="code"></div>
+    <div class="stats">
+      <span>шаг <b id="sSteps">0</b></span>
+      <span>голова <b id="sHead">0</b></span>
+      <span>единиц <b id="sOnes">0</b></span>
+      <span>посещено <b id="sRange">[0, 0]</b></span>
+      <span id="sStatus" class="status-run">идёт</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Управление</h2>
+    <div class="row">
+      <button id="bReset" title="R">⟲ сброс</button>
+      <button id="bBack" title="←">◀ шаг</button>
+      <button id="bStep" title="→">шаг ▶</button>
+      <button id="bPlay" title="пробел">▶ пуск</button>
+      <label class="inline">скорость <input id="speed" type="range" min="0" max="10" value="4">
+        <span id="speedLbl"></span></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="bJump">прогнать до</button>
+      <input id="limit" type="number" min="1" value="1000">
+      <span class="hint" style="margin:0">шагов (или до остановки)</span>
+    </div>
+    <div class="hint">Клавиши: <kbd>→</kbd> шаг, <kbd>←</kbd> назад, <kbd>пробел</kbd> пуск/пауза, <kbd>R</kbd> сброс.</div>
+  </section>
+
+  <section>
+    <h2>Лента</h2>
+    <div id="tapeWrap"><div id="tape"></div></div>
+    <div class="hint" id="tapeHint">На шаге 0 клик по клетке меняет начальную ленту.</div>
+    <div class="row" style="margin-top:8px">
+      <button id="bClearTape">очистить начальную ленту</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Диаграмма пространство-время</h2>
+    <div class="hint" style="margin:0 0 8px">Строка — шаг (сверху вниз), столбец — клетка ленты.
+      Синий — 1, оранжевый — голова.</div>
+    <div class="row" style="margin-bottom:8px">
+      <label class="inline">масштаб <input id="zoom" type="range" min="1" max="30" value="14"></label>
+      <label class="inline"><input id="onlyLoops" type="checkbox"> только строки на проверках
+        <kbd>[</kbd></label>
+    </div>
+    <div id="stWrap"><canvas id="st"></canvas></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const MAX_ROWS = 20000;
+
+// ---------- машина ----------
+let prog = [], match = [];
+let initTape = new Set();        // единицы начальной ленты
+let tape, head, pc, steps, hist, rows, lo, hi;
+
+function parse(s) {
+  const p = [...s].filter(c => !/\s/.test(c));
+  const m = new Array(p.length).fill(-1), st = [];
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    if (!"<>*[]".includes(c)) throw new Error(`недопустимый символ «${c}» на позиции ${i + 1}`);
+    if (c === "[") st.push(i);
+    if (c === "]") {
+      if (!st.length) throw new Error(`лишняя ] на позиции ${i + 1}`);
+      const j = st.pop(); m[i] = j; m[j] = i;
+    }
+  }
+  if (st.length) throw new Error(`незакрытая [ на позиции ${st.pop() + 1}`);
+  return [p, m];
+}
+
+// ] — бесплатный переход к своей [
+function settle(q) {
+  while (q < prog.length && prog[q] === "]") q = match[q];
+  return q;
+}
+
+function snapshotRow() {
+  rows.push({ head, pc, ones: Array.from(tape) });
+  if (rows.length > MAX_ROWS) rows.shift();
+}
+
+function reset() {
+  tape = new Set(initTape);
+  head = 0; pc = settle(0); steps = 0; hist = []; rows = [];
+  lo = Math.min(0, ...initTape); hi = Math.max(0, ...initTape);
+  snapshotRow();
+}
+
+const halted = () => pc >= prog.length;
+
+function step() {
+  if (halted()) return false;
+  const c = prog[pc], d = { pc, head, flip: null };
+  if (c === "<") { head--; pc++; }
+  else if (c === ">") { head++; pc++; }
+  else if (c === "*") { tape.has(head) ? tape.delete(head) : tape.add(head); d.flip = head; pc++; }
+  else if (c === "[") { pc = tape.has(head) ? pc + 1 : match[pc] + 1; }
+  pc = settle(pc);
+  steps++; hist.push(d);
+  if (head < lo) lo = head; if (head > hi) hi = head;
+  snapshotRow();
+  return true;
+}
+
+function back() {
+  if (!hist.length) return false;
+  const d = hist.pop();
+  if (d.flip !== null) tape.has(d.flip) ? tape.delete(d.flip) : tape.add(d.flip);
+  pc = d.pc; head = d.head; steps--;
+  rows.pop();
+  if (rows.length === 0) rebuildRows();
+  return true;
+}
+
+// после отката за пределы сохранённых строк: пересчитать с начала
+function rebuildRows() {
+  const target = steps; const keepInit = initTape;
+  initTape = keepInit; reset();
+  while (steps < target) step();
+}
+
+// ---------- отрисовка ----------
+function renderCode() {
+  const el = $("code"); el.innerHTML = "";
+  prog.forEach((c, i) => {
+    const s = document.createElement("span");
+    s.textContent = c;
+    if (i === pc) s.className = "pc";
+    el.appendChild(s);
+  });
+  const e = document.createElement("span");
+  e.className = "end" + (halted() ? " pc" : "");
+  e.textContent = "⏹";
+  e.title = "конец программы — остановка";
+  el.appendChild(e);
+}
+
+function renderStats() {
+  $("sSteps").textContent = steps;
+  $("sHead").textContent = head;
+  $("sOnes").textContent = tape.size;
+  $("sRange").textContent = `[${lo}, ${hi}]`;
+  const st = $("sStatus");
+  if (halted()) { st.textContent = `остановилась за ${steps} шаг.`; st.className = "status-halt"; }
+  else { st.textContent = playing ? "идёт…" : "пауза"; st.className = "status-run"; }
+  $("bBack").disabled = steps === 0;
+  $("bStep").disabled = halted();
+  $("bPlay").textContent = playing ? "⏸ пауза" : "▶ пуск";
+  $("tapeHint").textContent = steps === 0
+    ? "На шаге 0 клик по клетке меняет начальную ленту."
+    : "Чтобы менять начальную ленту, вернись на шаг 0 (сброс).";
+}
+
+function renderTape() {
+  const wrap = $("tapeWrap"), el = $("tape");
+  const n = Math.max(7, Math.floor((wrap.clientWidth + 3) / 29) | 1);
+  const half = (n - 1) >> 1;
+  el.innerHTML = "";
+  for (let x = head - half; x <= head + half; x++) {
+    const c = document.createElement("div");
+    c.className = "cell" + (tape.has(x) ? " one" : "") + (x === head ? " head" : "");
+    c.textContent = tape.has(x) ? "1" : "0";
+    if (x % 5 === 0) { const i = document.createElement("span"); i.className = "idx"; i.textContent = x; c.appendChild(i); }
+    c.onclick = () => toggleInit(x);
+    el.appendChild(c);
+  }
+}
+
+function renderST() {
+  const only = $("onlyLoops").checked;
+  const rs = only ? rows.filter(r => prog[r.pc] === "[" || r.pc >= prog.length) : rows;
+  let a = Infinity, b = -Infinity;
+  for (const r of rs) {
+    a = Math.min(a, r.head); b = Math.max(b, r.head);
+    for (const x of r.ones) { if (x < a) a = x; if (x > b) b = x; }
+  }
+  a -= 2; b += 2;
+  const W = b - a + 1, H = Math.max(1, rs.length);
+  const cv = $("st"), ctx = cv.getContext("2d");
+  cv.width = W; cv.height = H;
+  const z = +$("zoom").value;
+  const wrapW = $("stWrap").clientWidth;
+  const scale = Math.max(1, Math.min(z, Math.floor(wrapW / W) || 1));
+  cv.style.width = W * scale + "px"; cv.style.height = H * scale + "px";
+  const css = getComputedStyle(document.documentElement);
+  const rgb = v => { const t = document.createElement("canvas").getContext("2d");
+    t.fillStyle = css.getPropertyValue(v).trim(); t.fillRect(0, 0, 1, 1); return t.getImageData(0, 0, 1, 1).data; };
+  const c0 = rgb("--zero"), c1 = rgb("--one"), ch = rgb("--head");
+  const img = ctx.createImageData(W, H), d = img.data;
+  for (let i = 0; i < W * H; i++) { d[4*i] = c0[0]; d[4*i+1] = c0[1]; d[4*i+2] = c0[2]; d[4*i+3] = 255; }
+  const put = (y, x, c) => { const i = 4 * (y * W + x - a); d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2]; };
+  rs.forEach((r, y) => {
+    for (const x of r.ones) put(y, x, c1);
+    if (r.ones.includes(r.head)) put(y, r.head, [(c1[0]+ch[0])>>1, (c1[1]+ch[1])>>1, (c1[2]+ch[2])>>1]);
+    else put(y, r.head, ch);
+  });
+  ctx.putImageData(img, 0, 0);
+  const w = $("stWrap"); w.scrollTop = w.scrollHeight;
+}
+
+let dirty = false;
+function render() {
+  if (dirty) return; dirty = true;
+  requestAnimationFrame(() => { dirty = false; renderCode(); renderStats(); renderTape(); renderST(); });
+}
+
+// ---------- ввод ----------
+function load() {
+  try {
+    [prog, match] = parse($("src").value);
+    $("err").textContent = "";
+  } catch (e) { $("err").textContent = e.message; prog = []; match = []; }
+  stop(); reset(); render();
+}
+
+function toggleInit(x) {
+  if (steps !== 0) return;
+  initTape.has(x) ? initTape.delete(x) : initTape.add(x);
+  reset(); render();
+}
+
+// ---------- пуск ----------
+const SPEEDS = [1, 2, 4, 8, 15, 30, 60, 300, 1500, 6000, 30000]; // шагов в секунду
+let playing = false, last = 0, acc = 0;
+function speedLabel() { $("speedLbl").textContent = SPEEDS[+$("speed").value] + " ш/с"; }
+function loop(t) {
+  if (!playing) return;
+  const dt = Math.min(0.25, (t - last) / 1000); last = t;
+  acc += dt * SPEEDS[+$("speed").value];
+  let n = Math.floor(acc); acc -= n;
+  while (n-- > 0) if (!step()) { stop(); break; }
+  render();
+  if (playing) requestAnimationFrame(loop);
+}
+function play() { if (halted()) return; playing = true; acc = 0; last = performance.now(); requestAnimationFrame(loop); render(); }
+function stop() { playing = false; render(); }
+
+$("src").addEventListener("input", load);
+$("examples").addEventListener("change", e => { if (e.target.value) { $("src").value = e.target.value; e.target.value = ""; load(); } });
+$("bReset").onclick = () => { stop(); reset(); render(); };
+$("bStep").onclick = () => { stop(); step(); render(); };
+$("bBack").onclick = () => { stop(); back(); render(); };
+$("bPlay").onclick = () => playing ? stop() : play();
+$("bJump").onclick = () => { stop(); const n = Math.max(1, +$("limit").value || 1); for (let i = 0; i < n && step(); i++); render(); };
+$("bClearTape").onclick = () => { initTape = new Set(); stop(); reset(); render(); };
+$("speed").oninput = speedLabel;
+$("zoom").oninput = render;
+$("onlyLoops").onchange = render;
+window.addEventListener("resize", render);
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" && e.target.type !== "range" && e.target.type !== "checkbox") return;
+  if (e.key === "ArrowRight") { stop(); step(); render(); e.preventDefault(); }
+  else if (e.key === "ArrowLeft") { stop(); back(); render(); e.preventDefault(); }
+  else if (e.key === " ") { playing ? stop() : play(); e.preventDefault(); }
+  else if (e.key === "r" || e.key === "R") { stop(); reset(); render(); }
+});
+
+speedLabel();
+load();
+</script>
+</body>
+</html>
