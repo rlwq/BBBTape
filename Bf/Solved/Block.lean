@@ -100,6 +100,168 @@ theorem Shape.not_halts (B : Shape) {prog : Program} {j b : Nat}
   generalize (B.gA + 1 - B.e) * m = q
   omega
 
+theorem mul_step {i J d : Nat} (hi : i < J) : i * d + d ≤ J * d := by
+  have := Nat.mul_le_mul_right d (show i + 1 ≤ J by omega)
+  rw [Nat.succ_mul] at this
+  exact this
+
+structure Wide where
+  outer : Program
+  inner : Program
+  tA : Nat
+  tB : Nat
+  tC : Nat
+  tD : Nat
+  d : Nat
+  dD : Nat
+  gA : Nat
+  r : Nat
+  e : Nat
+  L : Nat
+  hmin : Nat
+  pos : 0 < tA
+  hA : ∀ h : Nat, hmin ≤ h →
+    (Config.mk (blk 0 h) outer).steps tA = some ⟨blk 0 (h + gA), inner⟩
+  hB : ∀ lo hi : Int, lo ≤ 0 → 0 ≤ hi →
+    (Config.mk (blk lo hi) inner).steps tB = some ⟨blk (lo - d) (hi - d), inner⟩
+  hC : ∀ lo : Int, lo ≤ -(L : Int) →
+    (Config.mk (blk lo (-(r : Int))) inner).steps tC = some ⟨blk (lo + e) 0, outer⟩
+  hD : ∀ lo hi : Int, lo ≤ -(dD : Int) → 0 ≤ hi →
+    (Config.mk (blk lo hi) outer).steps tD = some ⟨blk (lo + dD) (hi + dD), outer⟩
+
+theorem Wide.pass (W : Wide) {h J K : Nat} (hh : W.hmin ≤ h) (hr : W.r ≤ W.d)
+    (hJ : J * W.d = h + W.gA + W.r) (hK : K * W.dD + W.e = h + W.gA + W.r)
+    (hL : W.L ≤ h + W.gA + W.r) :
+    ∃ k : Nat, 0 < k ∧
+      (Config.mk (blk 0 h) W.outer).steps k = some ⟨blk 0 ((K * W.dD : Nat) : Int), W.outer⟩ := by
+  have h₁ := shift (W.hA h hh) (lo' := 0) (hi' := ((h + W.gA : Nat) : Int)) rfl (by omega)
+  have h₂ := iterate (C := fun (lo hi : Int) => lo ≤ 0 ∧ 0 ≤ hi)
+    (fun (lo hi : Int) (hc : lo ≤ 0 ∧ 0 ≤ hi) => by
+      have := W.hB lo hi hc.1 hc.2
+      rw [show lo - W.d = lo + -(W.d : Int) by omega, show hi - W.d = hi + -(W.d : Int) by omega] at this
+      exact this) J 0 ((h + W.gA : Nat) : Int)
+    (fun (i : Nat) (hi : i < J) => by
+      have hm := mul_step (d := W.d) hi
+      constructor
+      · rw [Int.mul_neg, ← Int.natCast_mul]; omega
+      · rw [Int.mul_neg, ← Int.natCast_mul]; omega)
+  have h₂' := shift h₂ (lo' := -((h + W.gA + W.r : Nat) : Int)) (hi' := -(W.r : Int))
+    (by rw [Int.mul_neg, ← Int.natCast_mul]; omega) (by rw [Int.mul_neg, ← Int.natCast_mul]; omega)
+  have h₃ := W.hC (-((h + W.gA + W.r : Nat) : Int)) (by omega)
+  have h₄ := iterate (C := fun (lo hi : Int) => lo ≤ -(W.dD : Int) ∧ 0 ≤ hi)
+    (fun (lo hi : Int) (hc : lo ≤ -(W.dD : Int) ∧ 0 ≤ hi) => W.hD lo hi hc.1 hc.2) K
+    (-((h + W.gA + W.r : Nat) : Int) + W.e) 0
+    (fun (i : Nat) (hi : i < K) => by
+      have hm := mul_step (d := W.dD) hi
+      constructor
+      · rw [← Int.natCast_mul]; omega
+      · rw [← Int.natCast_mul]; omega)
+  have h₄' := shift h₄ (lo' := 0) (hi' := ((K * W.dD : Nat) : Int))
+    (by rw [← Int.natCast_mul]; omega) (by rw [← Int.natCast_mul]; omega)
+  exact ⟨_, by have := W.pos; omega, steps_trans (steps_trans (steps_trans h₁ h₂') h₃) h₄'⟩
+
+theorem Wide.not_halts (W : Wide) {prog : Program} {j b g : Nat} (J K : Nat → Nat)
+    (start : prog.init.steps j = some ⟨blk 0 b, W.outer⟩) (hb : W.hmin ≤ b) (hr : W.r ≤ W.d)
+    (hJ : ∀ m : Nat, J m * W.d = b + g * m + W.gA + W.r)
+    (hK : ∀ m : Nat, K m * W.dD + W.e = b + g * m + W.gA + W.r)
+    (hg : ∀ m : Nat, K m * W.dD = b + g * (m + 1))
+    (hL : W.L ≤ b + W.gA + W.r) : ¬ prog.init.Halts := by
+  refine Block.not_halts (a := g) (b := b) start fun (m : Nat) => ?_
+  obtain ⟨k, hk, hs⟩ := W.pass (h := g * m + b) (J := J m) (K := K m) (by omega) hr
+    (by rw [hJ m]; omega) (by rw [hK m]; omega) (by omega)
+  refine ⟨k, hk, ?_⟩
+  rw [show ((g * m + b : Nat) : Int) = (g : Int) * m + b by push_cast; rfl] at hs
+  rw [hs]
+  congr 3
+  rw [hg m]
+  push_cast
+  omega
+
+def nf (lo hi : Int) (xs : List Int) : Tape :=
+  ⟨fun (i : Int) => (decide (lo ≤ i ∧ i ≤ hi)).xor (decide (xs.count i % 2 = 1))⟩
+
+theorem count_map_add (xs : List Int) (k i : Int) :
+    (xs.map fun (x : Int) => x + k).count i = xs.count (i - k) := by
+  induction xs with
+  | nil => rfl
+  | cons x xs ih =>
+    simp only [List.map_cons, List.count_cons, ih, beq_iff_eq]
+    congr 1
+    by_cases h : x = i - k
+    · subst h; simp
+    · rw [if_neg (by omega), if_neg h]
+
+theorem blk_eq_nf (lo hi : Int) : blk lo hi = nf lo hi [] := by
+  unfold blk nf
+  congr 1
+  funext i
+  simp
+
+theorem nf_moveL (lo hi : Int) (xs : List Int) :
+    (nf lo hi xs).moveL = nf (lo + 1) (hi + 1) (xs.map fun (x : Int) => x + 1) := by
+  unfold nf Tape.moveL
+  congr 1
+  funext i
+  rw [count_map_add]
+  have e : (lo ≤ i - 1 ∧ i - 1 ≤ hi) = (lo + 1 ≤ i ∧ i ≤ hi + 1) := propext (by omega)
+  simp only [e]
+
+theorem nf_moveR (lo hi : Int) (xs : List Int) :
+    (nf lo hi xs).moveR = nf (lo + -1) (hi + -1) (xs.map fun (x : Int) => x + -1) := by
+  unfold nf Tape.moveR
+  congr 1
+  funext i
+  rw [count_map_add, show i - -1 = i + 1 by omega]
+  have e : (lo ≤ i + 1 ∧ i + 1 ≤ hi) = (lo + -1 ≤ i ∧ i ≤ hi + -1) := propext (by omega)
+  simp only [e]
+
+theorem nf_flip (lo hi : Int) (xs : List Int) : (nf lo hi xs).flip = nf lo hi (0 :: xs) := by
+  unfold nf Tape.flip Tape.head
+  congr 1
+  funext i
+  by_cases h : i = 0
+  · subst h
+    simp only [↓reduceIte, List.count_cons_self]
+    cases decide (lo ≤ 0 ∧ 0 ≤ hi) <;> cases hc : decide (xs.count 0 % 2 = 1) <;>
+      simp_all <;> omega
+  · rw [if_neg h, List.count_cons_of_ne (Ne.symm h)]
+
+theorem nf_head (lo hi : Int) (xs : List Int) :
+    (nf lo hi xs).head = (decide (lo ≤ 0 ∧ 0 ≤ hi)).xor (decide (xs.count 0 % 2 = 1)) := rfl
+
+theorem nf_cells (lo hi : Int) (xs : List Int) (i : Int) :
+    (nf lo hi xs).cells i = (decide (lo ≤ i ∧ i ≤ hi)).xor (decide (xs.count i % 2 = 1)) := rfl
+
+theorem blank_eq_nf : Tape.blank = nf 0 (-1) [] := by
+  unfold nf Tape.blank
+  congr 1
+  funext i
+  simp only [List.count_nil]
+  rw [Bool.eq_iff_iff]
+  simp
+  omega
+
+theorem xor_decide (p q : Prop) [Decidable p] [Decidable q] :
+    (decide p ^^ decide q) = decide (¬ (p ↔ q)) := by
+  by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
+
+attribute [irreducible] nf
+
+macro "nf_tac" : tactic => `(tactic| (
+  (try simp only [blk_eq_nf, Program.init, blank_eq_nf])
+  all_goals (set_option linter.deprecated false in
+    (try simp (disch := omega) [Config.steps, Config.step, nf_moveL, nf_moveR, nf_flip, nf_cells, nf_head,
+      decide_eq_true, decide_eq_false, if_pos, if_neg, Int.add_assoc]))
+  all_goals (
+    unfold nf
+    congr 1)
+  all_goals (funext i)
+  all_goals (try simp only [xor_decide])
+  all_goals (try rw [decide_eq_decide])
+  all_goals (try simp only [List.count_cons, List.count_nil, beq_iff_eq])
+  all_goals (repeat' split)
+  all_goals omega))
+
 macro "blk_tac" : tactic => `(tactic| (
   set_option linter.deprecated false in
   simp (disch := omega) [Config.steps, Config.step, blk, Tape.head, Tape.moveL, Tape.moveR,

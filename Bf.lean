@@ -9,6 +9,7 @@ import Bf.BB
 import Bf.Verdict
 import Bf.Generator
 import Bf.Generators.Trivial
+import Bf.Generators.Canonical
 import Bf.Canon
 import Bf.Canons.Seg
 import Bf.Canons.DeadLoops
@@ -31,5 +32,8 @@ import Bf.Solved.Block
 import Bf.Solved.Bouncers11
 import Bf.Solved.HoleBouncer
 import Bf.Solved.Dilated
+import Bf.Solved.Wide2
+import Bf.Solved.Bouncers12
+import Bf.Solved.Bouncers12b
 import Bf.Certificate
 import Bf.Results
