@@ -9,7 +9,7 @@ def ZeroBeyond (t : Tape) (r : Nat) : Prop :=
   ∀ i : Int, (r : Int) < i ∨ i < -(r : Int) → t.cells i = false
 
 theorem zeroBeyond_blank : blank.ZeroBeyond 0 :=
-  fun (_ : Int) (_ : ((0 : Nat) : Int) < _ ∨ _ < -((0 : Nat) : Int)) => rfl
+  fun (i : Int) (_ : ((0 : Nat) : Int) < i ∨ i < -((0 : Nat) : Int)) => cells_blank i
 
 theorem ZeroBeyond.mono {t : Tape} {r r' : Nat} (h : t.ZeroBeyond r) (hr : r ≤ r') :
     t.ZeroBeyond r' :=
@@ -24,13 +24,20 @@ theorem zeroBeyond_step {c c' : Config} {r : Nat} (hs : c.step = some c')
   obtain ⟨t, p⟩ := c
   cases p with
   | nil => cases hs
-  | left => cases hs; intro i hi; exact h (i - 1) (by omega)
-  | right => cases hs; intro i hi; exact h (i + 1) (by omega)
+  | hole => cases hs
+  | left =>
+    cases hs; intro i hi
+    show t.moveL.cells i = false
+    rw [Tape.cells_moveL]; exact h (i - 1) (by omega)
+  | right =>
+    cases hs; intro i hi
+    show t.moveR.cells i = false
+    rw [Tape.cells_moveR]; exact h (i + 1) (by omega)
   | flip =>
     cases hs; intro i hi
-    show (if i = 0 then _ else t.cells i) = false
+    show t.flip.cells i = false
     have hi0 : i ≠ 0 := by omega
-    simp only [hi0, ↓reduceIte]; exact h i (by omega)
+    rw [Tape.cells_flip]; simp only [hi0, ↓reduceIte]; exact h i (by omega)
   | loop => cases hs; exact h.mono (by omega)
 
 theorem zeroBeyond_steps {c c' : Config} {r k : Nat} (hs : c.steps k = some c')
@@ -75,17 +82,22 @@ theorem Agree.step {lo : Int} {c d : Config} (h : Agree lo c d) (hlo : lo ≤ 0)
   subst hp
   cases p with
   | nil => exact .inl ⟨rfl, rfl⟩
+  | hole => exact .inl ⟨rfl, rfl⟩
   | left =>
-    exact .inr ⟨_, _, rfl, rfl, rfl,
-      fun (i : Int) (hi : _ ≤ i) => hc (i - 1) (by simp only [δ] at hi; omega)⟩
+    refine .inr ⟨_, _, rfl, rfl, rfl, fun (i : Int) (hi : _ ≤ i) => ?_⟩
+    show t.moveL.cells i = u.moveL.cells i
+    rw [Tape.cells_moveL, Tape.cells_moveL]
+    exact hc (i - 1) (by simp only [δ] at hi; omega)
   | right =>
-    exact .inr ⟨_, _, rfl, rfl, rfl,
-      fun (i : Int) (hi : _ ≤ i) => hc (i + 1) (by simp only [δ] at hi; omega)⟩
+    refine .inr ⟨_, _, rfl, rfl, rfl, fun (i : Int) (hi : _ ≤ i) => ?_⟩
+    show t.moveR.cells i = u.moveR.cells i
+    rw [Tape.cells_moveR, Tape.cells_moveR]
+    exact hc (i + 1) (by simp only [δ] at hi; omega)
   | flip =>
     refine .inr ⟨_, _, rfl, rfl, rfl, fun (i : Int) (hi : _ ≤ i) => ?_⟩
     simp only [δ, Int.sub_zero] at hi
-    show (if i = 0 then !t.cells 0 else t.cells i) = (if i = 0 then !u.cells 0 else u.cells i)
-    rw [hc 0 hlo, hc i hi]
+    show t.flip.cells i = u.flip.cells i
+    rw [Tape.cells_flip, Tape.cells_flip, hc 0 hlo, hc i hi]
   | loop b p =>
     have e : t.head = u.head := hc 0 hlo
     refine .inr ⟨_, _, rfl, rfl, ?_, fun (i : Int) (hi : _ ≤ i) => hc i (by simp only [δ] at hi; omega)⟩

@@ -55,6 +55,7 @@ theorem step_append (t : Tape) (p r : Program) (hp : p ≠ .nil) :
   cases p with
   | nil => exact absurd rfl hp
   | left p | right p | flip p => rfl
+  | hole => rfl
   | loop b p =>
     simp only [step, Program.loop_append, Option.map_some]
     split <;> simp [Program.append_assoc]

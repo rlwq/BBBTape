@@ -16,6 +16,7 @@ def step : Config → Option Config
   | ⟨t, .right p⟩  => some ⟨t.moveR, p⟩
   | ⟨t, .flip p⟩   => some ⟨t.flip, p⟩
   | ⟨t, .loop b p⟩ => some ⟨t, if t.head then b ++ .loop b p else p⟩
+  | ⟨_, .hole _ _⟩ => none
 
 def steps (c : Config) : Nat → Option Config
   | 0     => some c
@@ -86,6 +87,7 @@ theorem haltsIn_size_of_loopFree {p : Program} (h : p.loopFree = true) (t : Tape
   induction p generalizing t with
   | nil => exact Config.haltsIn_zero.mpr rfl
   | loop => cases h
+  | hole => cases h
   | left p ih | right p ih | flip p ih => exact (Config.haltsIn_succ rfl).mpr (ih h _)
 
 end Program

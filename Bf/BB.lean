@@ -2,7 +2,7 @@ import Bf.Config
 
 namespace Bf
 
-def Reachable (n k : Nat) : Prop := ∃ p : Program, p.size = n ∧ p.init.HaltsIn k
+def Reachable (n k : Nat) : Prop := ∃ p : Program, p.Closed ∧ p.size = n ∧ p.init.HaltsIn k
 
 def IsBB (n s : Nat) : Prop := Reachable n s ∧ ∀ k : Nat, Reachable n k → k ≤ s
 

@@ -8,8 +8,9 @@ def Program.mirror : Program → Program
   | .right p  => .left p.mirror
   | .flip p   => .flip p.mirror
   | .loop b p => .loop b.mirror p.mirror
+  | .hole i k => .hole i k
 
-def Tape.mirror (t : Tape) : Tape := ⟨fun (i : Int) => t.cells (-i)⟩
+def Tape.mirror (t : Tape) : Tape := ⟨t.right, t.head, t.left, t.wfR, t.wfL⟩
 
 def Config.mirror (c : Config) : Config := ⟨c.tape.mirror, c.prog.mirror⟩
 
@@ -20,12 +21,14 @@ theorem mirror_append (p q : Program) : (p ++ q).mirror = p.mirror ++ q.mirror :
   | nil => rfl
   | left _ ih | right _ ih | flip _ ih => simp [mirror, ih]
   | loop _ _ _ ih => simp [mirror, ih]
+  | hole => rfl
 
 theorem size_mirror (p : Program) : p.mirror.size = p.size := by
   induction p with
   | nil => rfl
   | left _ ih | right _ ih | flip _ ih => simp [mirror, size, ih]
   | loop _ _ ihb ih => simp [mirror, size, ihb, ih]
+  | hole => rfl
 
 theorem init_mirror (p : Program) : p.mirror.init = p.init.mirror := rfl
 
@@ -35,22 +38,13 @@ namespace Tape
 
 theorem head_mirror (t : Tape) : t.mirror.head = t.head := rfl
 
-theorem moveL_mirror (t : Tape) : t.mirror.moveL = t.moveR.mirror := by
-  ext i
-  show t.cells (-(i - 1)) = t.cells (-i + 1)
-  congr 1; omega
+theorem moveL_mirror (t : Tape) : t.mirror.moveL = t.moveR.mirror := rfl
 
-theorem moveR_mirror (t : Tape) : t.mirror.moveR = t.moveL.mirror := by
-  ext i
-  show t.cells (-(i + 1)) = t.cells (-i - 1)
-  congr 1; omega
+theorem moveR_mirror (t : Tape) : t.mirror.moveR = t.moveL.mirror := rfl
 
-theorem flip_mirror (t : Tape) : t.mirror.flip = t.flip.mirror := by
-  ext i
-  show (if i = 0 then !t.cells (-0) else t.cells (-i)) = (if -i = 0 then !t.cells 0 else t.cells (-i))
-  by_cases h : i = 0
-  · subst h; rfl
-  · simp [h]
+theorem flip_mirror (t : Tape) : t.mirror.flip = t.flip.mirror := rfl
+
+theorem blank_mirror : Tape.blank.mirror = Tape.blank := rfl
 
 end Tape
 
@@ -60,6 +54,7 @@ theorem step_mirror (c : Config) : c.mirror.step = c.step.map mirror := by
   obtain ⟨t, p⟩ := c
   cases p with
   | nil => rfl
+  | hole => rfl
   | left p => simp [mirror, step, Program.mirror, Tape.moveR_mirror]
   | right p => simp [mirror, step, Program.mirror, Tape.moveL_mirror]
   | flip p => simp [mirror, step, Program.mirror, Tape.flip_mirror]

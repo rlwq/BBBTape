@@ -1,3 +1,4 @@
+import Std.Data.HashSet
 import Bf.Config
 
 namespace Bf
@@ -92,15 +93,15 @@ theorem cells_apply (s : Seg) (t : Tape) (i : Int) :
   | cons c s ih =>
     cases c with
     | flip =>
-      simp only [apply, Cmd.app, ih, disp, par, Tape.flip, Tape.head]
+      simp only [apply, Cmd.app, ih, disp, par, Tape.cells_flip]
       by_cases h : i + disp s = 0
       · simp only [h, ↓reduceIte, decide_true]; cases t.cells 0 <;> cases par s 0 <;> rfl
       · simp [h]
     | left =>
-      simp only [apply, Cmd.app, ih, disp, par, Tape.moveL]
+      simp only [apply, Cmd.app, ih, disp, par, Tape.cells_moveL]
       congr 2 <;> omega
     | right =>
-      simp only [apply, Cmd.app, ih, disp, par, Tape.moveR]
+      simp only [apply, Cmd.app, ih, disp, par, Tape.cells_moveR]
       congr 2 <;> omega
 
 def window (f : Int → Bool) (r : Nat) : List Bool :=
@@ -148,10 +149,108 @@ theorem prepend_splitSeg (p : Program) : Seg.prepend (splitSeg p).1 (splitSeg p)
   induction p with
   | nil => rfl
   | loop => rfl
+  | hole => rfl
   | left p ih | right p ih | flip p ih =>
     simp only [splitSeg, Seg.prepend, List.foldr] at *
     rw [ih]; rfl
 
 end Program
+
+namespace Seg
+
+def eff (s : Seg) : Int × List Bool := (disp s, window (par s) s.length)
+
+theorem apply_eq_of_eff {s s' : Seg} (hl : s.length = s'.length) (he : eff s = eff s')
+    (t : Tape) : apply s t = apply s' t := by
+  obtain ⟨hd, hw⟩ := Prod.mk.inj he
+  rw [hl] at hw
+  have hpar : ∀ j : Int, par s j = par s' j := by
+    intro j
+    by_cases hj : -(s'.length : Int) ≤ j ∧ j ≤ s'.length
+    · exact eq_of_window hw j hj
+    · rw [par_eq_false s j (by omega), par_eq_false s' j (by omega)]
+  ext i
+  rw [cells_apply, cells_apply, hd, hpar]
+
+def canon (s : Seg) : Seg :=
+  let w : Seg := greedy (disp s) s.length 0 (support (par s) s.length)
+  if w.length = s.length ∧ eff w = eff s then w else s
+
+theorem length_canon (s : Seg) : (canon s).length = s.length := by
+  unfold canon; dsimp only; split
+  · next h => exact h.1
+  · rfl
+
+theorem apply_canon (s : Seg) (t : Tape) : apply (canon s) t = apply s t := by
+  unfold canon; dsimp only; split
+  · next h => exact apply_eq_of_eff h.1 h.2 t
+  · rfl
+
+end Seg
+
+
+deriving instance Hashable for Cmd
+
+namespace Seg
+
+def ofLength : Nat → List Seg
+  | 0     => [[]]
+  | L + 1 => (ofLength L).flatMap fun (s : Seg) => [.flip :: s, .left :: s, .right :: s]
+
+theorem mem_ofLength (s : Seg) : s ∈ ofLength s.length := by
+  induction s with
+  | nil => simp [ofLength]
+  | cons c s ih =>
+    simp only [List.length_cons, ofLength, List.mem_flatMap]
+    exact ⟨s, ih, by cases c <;> simp⟩
+
+def dedup (xs : List Seg) : List Seg :=
+  (xs.foldl (fun (m : Std.HashSet Seg) (x : Seg) => m.insert x) ∅).toList
+
+theorem mem_dedup {xs : List Seg} {a : Seg} : a ∈ dedup xs ↔ a ∈ xs := by
+  have h : ∀ (ys : List Seg) (m : Std.HashSet Seg),
+      a ∈ ys.foldl (fun (m : Std.HashSet Seg) (x : Seg) => m.insert x) m ↔ a ∈ m ∨ a ∈ ys := by
+    intro ys
+    induction ys with
+    | nil => intro m; simp
+    | cons y ys ih =>
+      intro m
+      rw [List.foldl_cons, ih, Std.HashSet.mem_insert, beq_iff_eq, List.mem_cons]
+      constructor
+      · rintro ((rfl | h) | h)
+        · exact .inr (.inl rfl)
+        · exact .inl h
+        · exact .inr (.inr h)
+      · rintro (h | rfl | h)
+        · exact .inl (.inr h)
+        · exact .inl (.inl rfl)
+        · exact .inr h
+  unfold dedup
+  rw [Std.HashSet.mem_toList, h]
+  simp [Std.HashSet.not_mem_empty]
+
+def mids (L : Nat) : List Seg := dedup ((ofLength L).map canon)
+
+theorem canon_mem_mids (s : Seg) : canon s ∈ mids s.length :=
+  mem_dedup.mpr (List.mem_map.mpr ⟨s, mem_ofLength s, rfl⟩)
+
+theorem length_of_mem_ofLength {L : Nat} {s : Seg} (h : s ∈ ofLength L) : s.length = L := by
+  induction L generalizing s with
+  | zero => simp [ofLength] at h; simp [h]
+  | succ L ih =>
+    simp only [ofLength, List.mem_flatMap, List.mem_cons, List.not_mem_nil, or_false] at h
+    obtain ⟨t, ht, rfl | rfl | rfl⟩ := h <;> simp [ih ht]
+
+theorem length_of_mem_mids {L : Nat} {s : Seg} (h : s ∈ mids L) : s.length = L := by
+  simp only [mids, mem_dedup, List.mem_map] at h
+  obtain ⟨t, ht, rfl⟩ := h
+  rw [length_canon, length_of_mem_ofLength ht]
+
+theorem prepend_replicate (n : Nat) : prepend (List.replicate n .flip) .nil = Program.stars n := by
+  induction n with
+  | zero => rfl
+  | succ n ih => simp [prepend, List.replicate, Cmd.prepend, Program.stars] at *; exact ih
+
+end Seg
 
 end Bf
