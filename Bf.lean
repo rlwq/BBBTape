@@ -1,23 +1,3 @@
-import Bf.Tape
-import Bf.Program
-import Bf.Syntax
-import Bf.Config
-import Bf.Simulation
-import Bf.Mirror
-import Bf.BB
-import Bf.Verdict
-import Bf.Decider
-import Bf.Deciders.LoopFree
-import Bf.Deciders.Simulator
-import Bf.Deciders.Mirror
-import Bf.Deciders.Translated
-import Bf.Deciders.Windows
-import Bf.Deciders.Blocks
-import Bf.Solved
-import Bf.Fill
-import Bf.Search
-import Bf.Certificate
-import Bf.Results
-import Bf.Seg
-import Bf.Normal
-import Bf.Canonical
+namespace Bf
+
+end Bf
