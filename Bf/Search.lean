@@ -40,43 +40,33 @@ end Bounded
 Returns the partial programs that could not be bounded by `B`; an empty list means
 every program refining `q` halts within `B` steps or never halts. -/
 def search (e : Expander) (d : Decider) (B : Nat) (q : Program) : List Program :=
-  match d.decide q with
-  | .halts t  => if t ≤ B then [] else [q]
-  | .diverges => []
-  | .stuck i  =>
-    if h : i < q.numGaps then
-      (e.expand q ⟨i, h⟩).attach.flatMap fun c => search e d B c.1
-    else [q]
-  | .unknown  => [q]
+  match d q with
+  | .halts t _  => if t ≤ B then [] else [q]
+  | .diverges _ => []
+  | .stuck i    => (e.expand q i).attach.flatMap fun c => search e d B c.1
+  | .unknown    => [q]
 termination_by q.gapSum
 decreasing_by exact e.decreasing c.2
 
 theorem search_bounded {e : Expander} {d : Decider} {B : Nat} (q : Program) :
     (∀ r ∈ search e d B q, Bounded B r) → Bounded B q := by
   intro h
-  have hsound := d.sound q
   rw [search] at h
-  cases hv : d.decide q with
-  | halts t =>
-    rw [hv] at h hsound
-    simp only at h hsound
+  cases hv : d q with
+  | halts t hq =>
+    rw [hv] at h
+    simp only at h
     by_cases ht : t ≤ B
-    · exact Bounded.of_halts hsound ht
+    · exact Bounded.of_halts hq ht
     · simp only [ht, ↓reduceIte] at h
       exact h q (List.mem_singleton_self _)
-  | diverges =>
-    rw [hv] at hsound
-    exact Bounded.of_diverges hsound
+  | diverges hq => exact Bounded.of_diverges hq
   | stuck i =>
     rw [hv] at h
     simp only at h
-    by_cases hi : i < q.numGaps
-    · simp only [hi, ↓reduceDIte] at h
-      refine Bounded.of_expand (e := e) ⟨i, hi⟩ fun c hc =>
-        search_bounded (e := e) (d := d) c fun r hr => h r ?_
-      exact List.mem_flatMap.mpr ⟨⟨c, hc⟩, List.mem_attach _ _, hr⟩
-    · simp only [hi, ↓reduceDIte] at h
-      exact h q (List.mem_singleton_self _)
+    refine Bounded.of_expand (e := e) i fun c hc =>
+      search_bounded (e := e) (d := d) c fun r hr => h r ?_
+    exact List.mem_flatMap.mpr ⟨⟨c, hc⟩, List.mem_attach _ _, hr⟩
   | unknown =>
     rw [hv] at h
     exact h q (List.mem_singleton_self _)

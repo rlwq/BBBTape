@@ -186,14 +186,10 @@ end Machine
 
 namespace Decider
 
-def translatedRight (k L : Nat) : Decider where
-  decide := fun (q : Program) => cond ((q.init Zipper).isTranslated k L) .diverges .unknown
-  sound  := fun (q : Program) => by
-    cases h : (q.init Zipper).isTranslated k L with
-    | true =>
-      exact Program.diverges_of
-        (Machine.diverges_of_isTranslated Machine.zeroBeyond_blank h)
-    | false => trivial
+def translatedRight (k L : Nat) : Decider := fun q =>
+  if h : (q.init Zipper).isTranslated k L then
+    .diverges (Program.diverges_of (Machine.diverges_of_isTranslated Machine.zeroBeyond_blank h))
+  else .unknown
 
 def translated (k L : Nat) : Decider :=
   translatedRight k L <|> (translatedRight k L).mirror

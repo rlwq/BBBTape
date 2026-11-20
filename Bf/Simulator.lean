@@ -13,86 +13,35 @@ def nextIds (m : Machine T) (ids : List Nat) : List Nat :=
   | .loop b _ => if Tape.cells m.tape 0 then ids.take b.numGaps ++ ids else ids.drop b.numGaps
   | _         => ids
 
-def stop (m : Machine T) (ids : List Nat) : Verdict :=
-  match m.prog with
-  | ε        => .halts 0
-  | .gap _ _ _ => .stuck (ids.headD 0)
-  | _        => .unknown
+theorem haltsIn_of_reached {q : Program} {m : Machine T} {j : Nat}
+    (hm : (q.init T) ⇒ j = some m) (hp : m.prog = ε) : (q.init T) ⇓ j :=
+  ⟨m.tape, by rw [hm]; cases m; cases hp; rfl⟩
 
-def sim : Nat → Machine T → List Nat → Verdict
-  | 0, m, ids =>
+theorem reached_succ {q : Program} {m m' : Machine T} {j : Nat}
+    (hm : (q.init T) ⇒ j = some m) (hs : m⇒ = some m') : (q.init T) ⇒ (j + 1) = some m' := by
+  rw [steps_add, hm]; simp [steps, hs]
+
+/-- `m` is `q` after `j` steps; `ids` tracks which gap of `q` each gap of `m` came from. -/
+def stop (q : Program) (m : Machine T) (j : Nat) (hm : (q.init T) ⇒ j = some m)
+    (ids : List Nat) : Verdict q :=
+  match hp : m.prog with
+  | ε          => .halts j (Program.haltsIn_of (haltsIn_of_reached hm hp))
+  | .gap _ _ _ =>
+    match ids with
+    | i :: _ => if h : i < q.numGaps then .stuck ⟨i, h⟩ else .unknown
+    | []     => .unknown
+  | _          => .unknown
+
+def sim (q : Program) :
+    (f : Nat) → (m : Machine T) → (j : Nat) → (q.init T) ⇒ j = some m → List Nat → Verdict q
+  | 0, m, j, hm, ids =>
     match m⇒ with
-    | none   => m.stop ids
+    | none   => stop q m j hm ids
     | some _ => .unknown
-  | f + 1, m, ids =>
-    match m⇒ with
-    | none    => m.stop ids
-    | some m' =>
-      match m'.sim f (m.nextIds ids) with
-      | .halts t => .halts (t + 1)
-      | v        => v
-
-theorem stop_halts {m : Machine T} {ids : List Nat} {k : Nat} :
-    m⇒ = none → m.stop ids = .halts k → k = 0 ∧ m.prog = ε := by
-  intro hs h
-  obtain ⟨t, p⟩ := m
-  cases p with
-  | nil => simp only [stop, Verdict.halts.injEq] at h; exact ⟨h.symm, rfl⟩
-  | gap => simp [stop] at h
-  | left | right | flip | loop => cases hs
-
-omit [Tape T] in
-theorem stop_ne_diverges {m : Machine T} {ids : List Nat} :
-    m.stop ids ≠ .diverges := by
-  unfold stop
-  cases m.prog <;> simp
-
-theorem sim_halts {f : Nat} {m : Machine T} {ids : List Nat} {k : Nat} :
-    m.sim f ids = .halts k → (m ⇓ k) := by
-  induction f generalizing m ids k with
-  | zero =>
-    intro h
-    unfold sim at h
-    cases hs : m⇒ with
-    | some _ => simp [hs] at h
-    | none =>
-      simp only [hs] at h
-      obtain ⟨rfl, hp⟩ := stop_halts hs h
-      exact haltsIn_zero.mpr hp
-  | succ f ih =>
-    intro h
-    unfold sim at h
-    cases hs : m⇒ with
-    | none =>
-      simp only [hs] at h
-      obtain ⟨rfl, hp⟩ := stop_halts hs h
-      exact haltsIn_zero.mpr hp
-    | some m' =>
-      simp only [hs] at h
-      cases hr : m'.sim f (m.nextIds ids) with
-      | halts j =>
-        rw [hr] at h
-        cases h
-        exact (haltsIn_succ hs).mpr (ih hr)
-      | diverges | stuck _ | unknown => rw [hr] at h; cases h
-
-theorem sim_ne_diverges {f : Nat} {m : Machine T} {ids : List Nat} :
-    m.sim f ids ≠ .diverges := by
-  induction f generalizing m ids with
-  | zero =>
-    unfold sim
-    cases m⇒ with
-    | none   => exact stop_ne_diverges
-    | some _ => simp
-  | succ f ih =>
-    unfold sim
-    cases m⇒ with
-    | none    => exact stop_ne_diverges
-    | some m' =>
-      simp only
-      cases hr : m'.sim f (m.nextIds ids) with
-      | halts _ | stuck _ | unknown => simp
-      | diverges => exact absurd hr ih
+  | f + 1, m, j, hm, ids =>
+    match hs : m⇒ with
+    | none    => stop q m j hm ids
+    | some m' => sim q f m' (j + 1) (reached_succ hm hs) (m.nextIds ids)
 
 @[specialize] def run : Nat → Machine T → Nat → Machine T × Nat
   | 0,     m, k => (m, k)
@@ -121,48 +70,24 @@ theorem run_steps {f k j : Nat} {m m' : Machine T} :
       obtain ⟨d, rfl, hd⟩ := ih h
       exact ⟨d + 1, by omega, by simp [steps, hs, hd]⟩
 
-@[inline] def verdict (limit : Nat) (q : Program) : Verdict :=
-  match run limit (q.init T) 0 with
+theorem reached_of_run {q : Program} {limit k : Nat} {m : Machine T} :
+    run limit (q.init T) 0 = (m, k) → (q.init T) ⇒ k = some m := by
+  intro h
+  obtain ⟨d, hk, hd⟩ := run_steps h
+  rw [hk, Nat.zero_add]; exact hd
+
+/-- Run fast without bookkeeping; only if execution hits a gap, rerun tracking gap ids. -/
+@[inline] def verdict (limit : Nat) (q : Program) : Verdict q :=
+  match hr : run limit (q.init T) 0 with
   | (m, k) =>
-    match m.prog with
-    | ε        => .halts k
-    | .gap _ _ _ => (q.init T).sim limit (List.range q.numGaps)
-    | _        => .unknown
-
-theorem verdict_halts {limit t : Nat} {q : Program} :
-    verdict (T := T) limit q = .halts t → (q.init T) ⇓ t := by
-  intro h
-  unfold verdict at h
-  rcases hr : run limit (q.init T) 0 with ⟨⟨u, p⟩, k⟩
-  rw [hr] at h
-  cases p with
-  | nil =>
-    obtain ⟨d, hk, hd⟩ := run_steps hr
-    simp only [Verdict.halts.injEq] at h
-    have hdt : d = t := by omega
-    subst hdt
-    exact ⟨u, hd⟩
-  | gap => exact sim_halts h
-  | left | right | flip | loop => cases h
-
-theorem verdict_ne_diverges {limit : Nat} {q : Program} :
-    verdict (T := T) limit q ≠ .diverges := by
-  intro h
-  unfold verdict at h
-  rcases hr : run limit (q.init T) 0 with ⟨⟨u, p⟩, k⟩
-  rw [hr] at h
-  cases p with
-  | gap => exact sim_ne_diverges h
-  | nil | left | right | flip | loop => cases h
+    match hp : m.prog with
+    | ε          => .halts k (Program.haltsIn_of (haltsIn_of_reached (reached_of_run hr) hp))
+    | .gap _ _ _ => sim q limit (q.init T) 0 rfl (List.range q.numGaps)
+    | _          => .unknown
 
 end Machine
 
-@[inline] def Decider.simulator (T : Type) [Tape T] (limit : Nat) : Decider where
-  decide := fun (q : Program) => Machine.verdict (T := T) limit q
-  sound  := fun (q : Program) => by
-    cases h : Machine.verdict (T := T) limit q with
-    | halts t           => exact Program.haltsIn_of (Machine.verdict_halts h)
-    | diverges          => exact absurd h Machine.verdict_ne_diverges
-    | stuck _ | unknown => trivial
+@[inline] def Decider.simulator (T : Type) [Tape T] (limit : Nat) : Decider :=
+  fun q => Machine.verdict (T := T) limit q
 
 end Bf

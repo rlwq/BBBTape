@@ -9,7 +9,7 @@ structure Certificate (n B : Nat) where
   decider  : Decider
   witness  : Program
   check    : search expander decider B (Program.gap? n) = [] ∧
-    witness° ∧ ‖witness‖ = n ∧ decider.decide witness = .halts B
+    witness° ∧ ‖witness‖ = n ∧ (decider witness).steps? = some B
 
 theorem Certificate.isBB {n v : Nat} (C : Certificate n v) : IsBB n v := by
   obtain ⟨hs, hc, hn, hr⟩ := C.check
@@ -18,8 +18,7 @@ theorem Certificate.isBB {n v : Nat} (C : Certificate n v) : IsBB n v := by
       rw [hs]
       intro r hr
       cases hr)
-  have hw := C.decider.sound C.witness
-  rw [hr] at hw
+  have hw := Verdict.haltsIn_of_steps? hr
   exact ⟨fun ⟨p, hp, hsz⟩ k hk => hroot.upper p k hp hsz hk, ⟨C.witness, hc, hn⟩, hw⟩
 
 end Bf

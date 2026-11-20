@@ -97,19 +97,16 @@ theorem Program.Equiv.mirror (p : Program) : p ~ p.mirror := fun _ =>
    fun hk => Program.haltsIn_of
      (Machine.Mirrored.haltsIn (m := p.mirror.init SpecTape) ⟨(mirror_mirror p).symm, fun _ => rfl⟩ (hk SpecTape))⟩
 
-def Decider.mirror (d : Decider) : Decider where
-  decide := fun (q : Program) =>
-    match d.decide q.mirror with
-    | .diverges => .diverges
-    | _         => .unknown
-  sound  := fun (q : Program) => by
-    have h := d.sound q.mirror
-    cases hv : d.decide q.mirror with
-    | diverges =>
-      rw [hv] at h
-      have hm : Machine.Mirrored (q.mirror.init SpecTape) (q.init SpecTape) :=
-        ⟨(Program.mirror_mirror q).symm, fun (_ : Int) => rfl⟩
-      exact Program.diverges_of (hm.diverges (h SpecTape))
-    | halts _ | stuck _ | unknown => trivial
+open scoped Machine in
+theorem Program.diverges_of_mirror {q : Program} : q.mirror⇑ → q⇑ := fun h =>
+  have hm : Machine.Mirrored (q.mirror.init SpecTape) (q.init SpecTape) :=
+    ⟨(Program.mirror_mirror q).symm, fun (_ : Int) => rfl⟩
+  Program.diverges_of (hm.diverges (h SpecTape))
+
+/-- Run `d` on the mirror image; only divergence transfers back, since gap ids are not mirrored. -/
+def Decider.mirror (d : Decider) : Decider := fun q =>
+  match d q.mirror with
+  | .diverges h => .diverges (Program.diverges_of_mirror h)
+  | _           => .unknown
 
 end Bf
