@@ -40,7 +40,7 @@ end Bounded
 Returns the partial programs that could not be bounded by `B`; an empty list means
 every program refining `q` halts within `B` steps or never halts. -/
 def search (e : Expander) (d : Decider) (B : Nat) (q : Program) : List Program :=
-  match d.run q with
+  match d.decide q with
   | .halts t  => if t ≤ B then [] else [q]
   | .diverges => []
   | .stuck i  =>
@@ -56,7 +56,7 @@ theorem search_bounded {e : Expander} {d : Decider} {B : Nat} (q : Program) :
   intro h
   have hsound := d.sound q
   rw [search] at h
-  cases hv : d.run q with
+  cases hv : d.decide q with
   | halts t =>
     rw [hv] at h hsound
     simp only at h hsound

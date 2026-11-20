@@ -31,8 +31,8 @@ end Verdict
 open scoped Machine
 
 @[ext] structure Decider where
-  run   : Program → Verdict
-  sound : ∀ q : Program, match run q with
+  decide : Program → Verdict
+  sound  : ∀ q : Program, match decide q with
     | .halts t  => q ⇓ t
     | .diverges => q⇑
     | _         => True
@@ -40,15 +40,15 @@ open scoped Machine
 namespace Decider
 
 def unknown : Decider where
-  run   := fun (_ : Program) => .unknown
-  sound := fun (_ : Program) => trivial
+  decide := fun (_ : Program) => .unknown
+  sound  := fun (_ : Program) => trivial
 
 def orElse (d₁ d₂ : Decider) : Decider where
-  run   := fun (q : Program) => d₁.run q <|> d₂.run q
-  sound := fun (q : Program) => by
+  decide := fun (q : Program) => d₁.decide q <|> d₂.decide q
+  sound  := fun (q : Program) => by
     have h₁ := d₁.sound q
     have h₂ := d₂.sound q
-    cases h : d₁.run q <;> simp [h] at h₁ ⊢ <;> first | exact h₁ | exact h₂
+    cases h : d₁.decide q <;> simp [h] at h₁ ⊢ <;> first | exact h₁ | exact h₂
 
 instance : OrElse Decider where
   orElse d₁ d₂ := d₁.orElse (d₂ ())
@@ -56,10 +56,10 @@ instance : OrElse Decider where
 @[simp] theorem unknown_orElse (d : Decider) : (unknown <|> d) = d := rfl
 
 @[simp] theorem orElse_unknown (d : Decider) : (d <|> unknown) = d := by
-  ext q; exact Verdict.orElse_unknown (d.run q)
+  ext q; exact Verdict.orElse_unknown (d.decide q)
 
 theorem orElse_assoc (a b c : Decider) : ((a <|> b) <|> c) = (a <|> (b <|> c)) := by
-  ext q; exact Verdict.orElse_assoc (a.run q) (b.run q) (c.run q)
+  ext q; exact Verdict.orElse_assoc (a.decide q) (b.decide q) (c.decide q)
 
 def any (ds : List Decider) : Decider :=
   ds.foldr (· <|> ·) unknown

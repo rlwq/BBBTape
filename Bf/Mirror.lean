@@ -98,13 +98,13 @@ theorem Program.Equiv.mirror (p : Program) : p ~ p.mirror := fun _ =>
      (Machine.Mirrored.haltsIn (m := p.mirror.init SpecTape) ⟨(mirror_mirror p).symm, fun _ => rfl⟩ (hk SpecTape))⟩
 
 def Decider.mirror (d : Decider) : Decider where
-  run   := fun (q : Program) =>
-    match d.run q.mirror with
+  decide := fun (q : Program) =>
+    match d.decide q.mirror with
     | .diverges => .diverges
     | _         => .unknown
-  sound := fun (q : Program) => by
+  sound  := fun (q : Program) => by
     have h := d.sound q.mirror
-    cases hv : d.run q.mirror with
+    cases hv : d.decide q.mirror with
     | diverges =>
       rw [hv] at h
       have hm : Machine.Mirrored (q.mirror.init SpecTape) (q.init SpecTape) :=

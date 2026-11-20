@@ -238,8 +238,8 @@ theorem check_sound {m fuel : Nat} {q : Program} :
 end Windows
 
 def Decider.windows (m fuel : Nat) : Decider where
-  run   := fun (q : Program) => cond (Windows.check m fuel q) .diverges .unknown
-  sound := fun (q : Program) => by
+  decide := fun (q : Program) => cond (Windows.check m fuel q) .diverges .unknown
+  sound  := fun (q : Program) => by
     cases h : Windows.check m fuel q with
     | true  => exact Windows.check_sound h
     | false => trivial

@@ -158,8 +158,8 @@ theorem verdict_ne_diverges {limit : Nat} {q : Program} :
 end Machine
 
 @[inline] def Decider.simulator (T : Type) [Tape T] (limit : Nat) : Decider where
-  run := fun (q : Program) => Machine.verdict (T := T) limit q
-  sound := fun (q : Program) => by
+  decide := fun (q : Program) => Machine.verdict (T := T) limit q
+  sound  := fun (q : Program) => by
     cases h : Machine.verdict (T := T) limit q with
     | halts t           => exact Program.haltsIn_of (Machine.verdict_halts h)
     | diverges          => exact absurd h Machine.verdict_ne_diverges

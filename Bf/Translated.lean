@@ -187,8 +187,8 @@ end Machine
 namespace Decider
 
 def translatedRight (k L : Nat) : Decider where
-  run   := fun (q : Program) => cond ((q.init Zipper).isTranslated k L) .diverges .unknown
-  sound := fun (q : Program) => by
+  decide := fun (q : Program) => cond ((q.init Zipper).isTranslated k L) .diverges .unknown
+  sound  := fun (q : Program) => by
     cases h : (q.init Zipper).isTranslated k L with
     | true =>
       exact Program.diverges_of

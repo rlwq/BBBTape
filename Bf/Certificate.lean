@@ -9,7 +9,7 @@ structure Certificate (n B : Nat) where
   decider  : Decider
   witness  : Program
   check    : search expander decider B (Program.gap? n) = [] ∧
-    witness° ∧ ‖witness‖ = n ∧ decider.run witness = .halts B
+    witness° ∧ ‖witness‖ = n ∧ decider.decide witness = .halts B
 
 theorem Certificate.isBB {n v : Nat} (C : Certificate n v) : IsBB n v := by
   obtain ⟨hs, hc, hn, hr⟩ := C.check

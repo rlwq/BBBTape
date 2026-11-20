@@ -320,8 +320,8 @@ theorem check_sound {B T limit : Nat} {q : Program} :
 end Blocks
 
 def Decider.blocks (B T limit : Nat) : Decider where
-  run   := fun (q : Program) => cond (Blocks.check B T limit q) .diverges .unknown
-  sound := fun (q : Program) => by
+  decide := fun (q : Program) => cond (Blocks.check B T limit q) .diverges .unknown
+  sound  := fun (q : Program) => by
     cases h : Blocks.check B T limit q with
     | true  => exact Blocks.check_sound h
     | false => trivial
