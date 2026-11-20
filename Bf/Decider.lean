@@ -20,16 +20,22 @@ def orElse : Verdict q → Verdict q → Verdict q
   | .unknown, v => v
   | v,        _ => v
 
+/-- Lazy in the second verdict: a later decider runs only if the earlier one gave up. -/
 instance : OrElse (Verdict q) where
-  orElse v₁ v₂ := v₁.orElse (v₂ ())
+  orElse v₁ v₂ := match v₁ with
+    | .unknown => v₂ ()
+    | v        => v
 
-@[simp] theorem unknown_orElse (v : Verdict q) : (.unknown <|> v) = v := rfl
-
-@[simp] theorem orElse_unknown (v : Verdict q) : (v <|> .unknown) = v := by
-  cases v <;> rfl
-
-theorem orElse_assoc (a b c : Verdict q) : ((a <|> b) <|> c) = (a <|> (b <|> c)) := by
+theorem orElse_eq (a b : Verdict q) : (a <|> b) = a.orElse b := by
   cases a <;> rfl
+
+/-- `orElse` with `unknown` forms a monoid: the first verdict that is not `unknown` wins. -/
+instance : Std.Associative (orElse (q := q)) where
+  assoc a _ _ := by cases a <;> rfl
+
+instance : Std.LawfulIdentity (orElse (q := q)) .unknown where
+  left_id _  := rfl
+  right_id v := by cases v <;> rfl
 
 /-- The number of steps, if the verdict is `halts`. -/
 def steps? : Verdict q → Option Nat
@@ -55,13 +61,19 @@ def orElse (d₁ d₂ : Decider) : Decider := fun q => d₁ q <|> d₂ q
 instance : OrElse Decider where
   orElse d₁ d₂ := d₁.orElse (d₂ ())
 
-@[simp] theorem unknown_orElse (d : Decider) : (unknown <|> d) = d := rfl
+theorem orElse_eq (a b : Decider) : (a <|> b) = a.orElse b := rfl
 
-@[simp] theorem orElse_unknown (d : Decider) : (d <|> unknown) = d :=
-  funext fun q => Verdict.orElse_unknown (d q)
+/-- The monoid on verdicts, lifted pointwise. -/
+instance : Std.Associative orElse where
+  assoc a b c := funext fun q => by
+    simp only [orElse, Verdict.orElse_eq]
+    exact Std.Associative.assoc (op := Verdict.orElse) (a q) (b q) (c q)
 
-theorem orElse_assoc (a b c : Decider) : ((a <|> b) <|> c) = (a <|> (b <|> c)) :=
-  funext fun q => Verdict.orElse_assoc (a q) (b q) (c q)
+instance : Std.LawfulIdentity orElse unknown where
+  left_id d  := funext fun q => by simp only [orElse, unknown, Verdict.orElse_eq]; rfl
+  right_id d := funext fun q => by
+    simp only [orElse, unknown, Verdict.orElse_eq]
+    exact Std.LawfulRightIdentity.right_id (op := Verdict.orElse) (d q)
 
 def any (ds : List Decider) : Decider :=
   ds.foldr (· <|> ·) unknown
