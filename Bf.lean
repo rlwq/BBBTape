@@ -1,3 +1,20 @@
-namespace Bf
-
-end Bf
+import Bf.Tape
+import Bf.Program
+import Bf.Syntax
+import Bf.Refines
+import Bf.Machine
+import Bf.Statement
+import Bf.Expand
+import Bf.Decider
+import Bf.Mirror
+import Bf.Simulator
+import Bf.Search
+import Bf.Zipper
+import Bf.Windows
+import Bf.Certificate
+import Bf.Translated
+import Bf.Blocks
+import Bf.Results
+import Bf.BB12
+import Bf.BB13
+import Bf.BB14

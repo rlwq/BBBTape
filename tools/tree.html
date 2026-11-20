@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дерево TNF &lt;&gt;*[]</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --border: #d9d9de;
+  --one: #2f5bd3; --zero: #ffffff; --head: #e8590c; --pc: #ffd43b; --pc-text: #1d1d1f;
+  --ok: #2b8a3e; --ok-bg: #ebfbee; --bad: #c92a2a; --bad-bg: #fff5f5;
+  --btn: #eef0f4; --btn-hover: #e1e4ea; --line: #c5c7d0;
+  --gap-bg: #fff3bf; --gap-border: #f08c00; --gap-dead: #e9ecef;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161618; --panel: #1f1f22; --text: #ececf0; --muted: #9a9aa3; --border: #34343a;
+    --one: #6f93ff; --zero: #26262a; --head: #ff8c42; --pc: #e0b100; --pc-text: #111;
+    --ok: #51cf66; --ok-bg: #1b2e20; --bad: #ff6b6b; --bad-bg: #311b1b;
+    --btn: #2a2a2f; --btn-hover: #35353b; --line: #45454e;
+    --gap-bg: #3b3010; --gap-border: #f59f00; --gap-dead: #2b2b30;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+section {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; margin-bottom: 14px;
+}
+.row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+select, button, input[type=number] {
+  font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--btn); color: var(--text); cursor: pointer;
+}
+input[type=number] { width: 74px; background: var(--bg); cursor: text; }
+button:hover { background: var(--btn-hover); }
+label.inline { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+kbd {
+  font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 4px;
+}
+
+/* Tree layout */
+#treeViewport {
+  overflow: auto; padding: 20px 10px 30px; min-height: 480px;
+}
+.tf-tree {
+  display: inline-flex; flex-direction: column; align-items: center; min-width: 100%;
+}
+.tf-tree ul {
+  display: flex; padding-top: 22px; position: relative; margin: 0; padding-left: 0;
+  list-style: none; justify-content: center;
+}
+.tf-tree li {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; padding: 22px 6px 0 6px;
+}
+.tf-tree li::before, .tf-tree li::after {
+  content: ''; position: absolute; top: 0; right: 50%;
+  border-top: 1.5px solid var(--line); width: 50%; height: 22px;
+}
+.tf-tree li::after {
+  right: auto; left: 50%; border-left: 1.5px solid var(--line);
+}
+.tf-tree li:only-child::after, .tf-tree li:only-child::before { display: none; }
+.tf-tree li:only-child { padding-top: 0; }
+.tf-tree li:first-child::before, .tf-tree li:last-child::after { border: 0 none; }
+.tf-tree li:last-child::before {
+  border-right: 1.5px solid var(--line); border-radius: 0 6px 0 0;
+}
+.tf-tree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+.tf-tree ul::before {
+  content: ''; position: absolute; top: 0; left: 50%;
+  border-left: 1.5px solid var(--line); width: 0; height: 22px;
+}
+
+/* Node card */
+.node-card {
+  background: var(--panel); border: 1.5px solid var(--border); border-radius: 9px;
+  padding: 7px 11px; display: inline-flex; flex-direction: column; align-items: center;
+  gap: 4px; cursor: pointer; user-select: none; transition: transform .08s, border-color .12s, box-shadow .12s;
+  position: relative; min-width: 64px;
+}
+.node-card:hover {
+  border-color: var(--one); transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+.node-card.status-halts {
+  border-color: var(--ok); background: var(--ok-bg);
+}
+.node-card.status-diverges {
+  border-color: var(--bad); background: var(--bad-bg);
+}
+.node-card.status-stuck {
+  border-color: var(--gap-border);
+}
+.node-card.expanded {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.prog-code {
+  font: 17px/1.25 ui-monospace, Menlo, Consolas, monospace;
+  display: inline-flex; align-items: center; gap: 1px; white-space: nowrap;
+}
+.tok-cmd { padding: 1px 1px; }
+.tok-br { color: var(--muted); font-weight: 600; }
+.tok-gap {
+  display: inline-flex; align-items: baseline;
+  padding: 1px 5px; margin: 0 1px; border-radius: 5px;
+  background: var(--gap-dead); border: 1px dashed var(--border);
+  font-size: 15px; color: var(--muted); cursor: pointer;
+}
+.tok-gap sub { font-size: 11px; margin-left: 1px; font-weight: 600; }
+.tok-gap.active {
+  background: var(--gap-bg); border: 1.5px solid var(--gap-border);
+  color: var(--text); font-weight: 700;
+}
+.tok-gap:hover {
+  outline: 2px solid var(--head);
+}
+
+.node-meta {
+  font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.badge-halts { color: var(--ok); font-weight: 700; }
+.badge-div { color: var(--bad); font-weight: 700; }
+.badge-stuck { color: var(--head); font-weight: 600; }
+.badge-prev {
+  font: 10px ui-monospace, Menlo, monospace; padding: 0 4px;
+  border-radius: 3px; background: var(--btn); color: var(--muted);
+}
+
+/* Mini tape inspector */
+#inspector {
+  font-size: 13px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center;
+}
+.mini-tape {
+  display: inline-flex; gap: 2px; align-items: center; vertical-align: middle;
+}
+.mini-cell {
+  width: 20px; height: 24px; border: 1px solid var(--border); border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 12px ui-monospace, Menlo, monospace; background: var(--zero); color: var(--muted);
+}
+.mini-cell.one { background: var(--one); border-color: var(--one); color: #fff; }
+.mini-cell.head { outline: 2px solid var(--head); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Дерево TNF &lt;&gt;*[]</h1>
+  <p class="sub">Интерактивный разворот дырок <kbd>?ₘ</kbd> по правилам из <code>Bf/Expand.lean</code> и <code>Bf/Simulator.lean</code>.
+    Клик по узлу раскрывает активную дырку (в которую упёрся симулятор), клик по конкретной <kbd>?ₖ</kbd> — раскрывает выбранную дырку.</p>
+
+  <section>
+    <div class="row">
+      <label class="inline">Длина <b>m</b>:
+        <input id="inpM" type="number" min="0" max="15" value="4">
+      </label>
+      <label class="inline">Лимит шагов:
+        <input id="inpLimit" type="number" min="10" max="5000" value="300">
+      </label>
+      <label class="inline" title="Пока в программе нет < и >, дырка не порождает > (mirror pruning)">
+        <input id="chkNoShift" type="checkbox" checked> <code>noShift</code> (без зеркал <code>&gt;</code>)
+      </label>
+      <label class="inline" title="После < не порождается >, после > не порождается < (NoCancel)">
+        <input id="chkNoCancel" type="checkbox" checked> <code>NoCancel</code> (без <code>&lt;&gt;</code> и <code>&gt;&lt;</code>)
+      </label>
+      <label class="inline" title="Останавливать и не ветвить узлы, которые уже дошли до .nil или зациклились">
+        <input id="chkTNF" type="checkbox" checked> TNF-симуляция (раскрывать только достижимую <code>?ₖ</code>)
+      </label>
+      <button id="btnReset">⟲ Сбросить к ?ₘ</button>
+      <button id="btnStepAll">Раскрыть 1 уровень</button>
+      <button id="btnExpandAll">Раскрыть всё дерево</button>
+    </div>
+    <div class="stats">
+      <span>видимых узлов: <b id="stNodes">1</b></span>
+      <span>раскрыто: <b id="stExpanded">0</b></span>
+      <span>остановилось (⇓): <b id="stHalted">0</b></span>
+      <span>зациклилось (⇑): <b id="stDiv">0</b></span>
+      <span>ждут раскрытия (?): <b id="stStuck">1</b></span>
+      <span>рекорд (max ⇓): <b id="stBest">—</b></span>
+    </div>
+  </section>
+
+  <section id="inspectorSec">
+    <div id="inspector">Наведи или кликни на узел, чтобы увидеть состояние машины и правила раскрытия дырки.</div>
+  </section>
+
+  <section id="treeViewport">
+    <div class="tf-tree" id="treeRoot"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+// ---------- AST Программы (в точности как в Bf/Program.lean) ----------
+// nil | left(p) | right(p) | flip(p) | loop(b, p) | gap(k, p)
+const P = {
+  nil: () => ({ tag: "nil" }),
+  left: p => ({ tag: "left", p }),
+  right: p => ({ tag: "right", p }),
+  flip: p => ({ tag: "flip", p }),
+  loop: (b, p) => ({ tag: "loop", b, p }),
+  gap: (k, p = { tag: "nil" }) => k === 0 ? p : ({ tag: "gap", k, p }),
+};
+
+function append(a, b) {
+  switch (a.tag) {
+    case "nil": return b;
+    case "left": return P.left(append(a.p, b));
+    case "right": return P.right(append(a.p, b));
+    case "flip": return P.flip(append(a.p, b));
+    case "loop": return P.loop(a.b, append(a.p, b));
+    case "gap": return { tag: "gap", k: a.k, p: append(a.p, b) };
+  }
+}
+
+function numGaps(p) {
+  switch (p.tag) {
+    case "nil": return 0;
+    case "left":
+    case "right":
+    case "flip": return numGaps(p.p);
+    case "loop": return numGaps(p.b) + numGaps(p.p);
+    case "gap": return 1 + numGaps(p.p);
+  }
+}
+
+function noShift(p) {
+  switch (p.tag) {
+    case "nil": return true;
+    case "left":
+    case "right": return false;
+    case "flip":
+    case "gap": return noShift(p.p);
+    case "loop": return noShift(p.b) && noShift(p.p);
+  }
+}
+
+// gapInfo? prev i q -> { prev, k } | null (как в Bf/Expand.lean)
+function gapInfo(prev, i, q) {
+  switch (q.tag) {
+    case "nil": return null;
+    case "left": return gapInfo("left", i, q.p);
+    case "right": return gapInfo("right", i, q.p);
+    case "flip": return gapInfo("none", i, q.p);
+    case "loop": {
+      const nb = numGaps(q.b);
+      if (i < nb) return gapInfo("none", i, q.b);
+      return gapInfo("none", i - nb, q.p);
+    }
+    case "gap":
+      if (i === 0) return { prev, k: q.k };
+      return gapInfo("none", i - 1, q.p);
+  }
+}
+
+// q[i ↦ s] (как в Bf/Program.lean)
+function subst(i, s, q) {
+  switch (q.tag) {
+    case "nil": return P.nil();
+    case "left": return P.left(subst(i, s, q.p));
+    case "right": return P.right(subst(i, s, q.p));
+    case "flip": return P.flip(subst(i, s, q.p));
+    case "loop": {
+      const nb = numGaps(q.b);
+      if (i < nb) return P.loop(subst(i, s, q.b), q.p);
+      return P.loop(q.b, subst(i - nb, s, q.p));
+    }
+    case "gap":
+      if (i === 0) return append(s, q.p);
+      return { tag: "gap", k: q.k, p: subst(i - 1, s, q.p) };
+  }
+}
+
+// shapesFor noShift prev k (как в Bf/Expand.lean)
+function shapesFor(useNoShift, useNoCancel, qNoShift, prev, k) {
+  if (k === 0) return [P.nil()];
+  const g = P.gap(k - 1);
+  const out = [];
+  const forbidLeft = useNoCancel && prev === "right";
+  const forbidRight = (useNoShift && qNoShift) || (useNoCancel && prev === "left");
+  if (!forbidLeft) out.push(P.left(g));
+  if (!forbidRight) out.push(P.right(g));
+  out.push(P.flip(g));
+  for (let a = 0; a <= k - 2; a++) {
+    const b = k - 2 - a;
+    out.push(P.loop(P.gap(a), P.gap(b)));
+  }
+  return out;
+}
+
+function expandProg(i, q) {
+  const useNoShift = $("chkNoShift").checked;
+  const useNoCancel = $("chkNoCancel").checked;
+  const info = gapInfo("none", i, q);
+  if (!info) return null;
+  const sh = shapesFor(useNoShift, useNoCancel, noShift(q), info.prev, info.k);
+  return sh.map(c => subst(i, c, q));
+}
+
+// ---------- Симулятор с отслеживанием nextIds (как в Bf/Simulator.lean) ----------
+function progKey(p) {
+  switch (p.tag) {
+    case "nil": return "";
+    case "left": return "<" + progKey(p.p);
+    case "right": return ">" + progKey(p.p);
+    case "flip": return "*" + progKey(p.p);
+    case "loop": return "[" + progKey(p.b) + "]" + progKey(p.p);
+    case "gap": return `?${p.k}` + progKey(p.p);
+  }
+}
+
+function simulate(q, limit) {
+  const ones = new Set();
+  let head = 0;
+  let prog = q;
+  let ids = Array.from({ length: numGaps(q) }, (_, idx) => idx);
+  let steps = 0;
+  let lo = 0, hi = 0;
+  const seen = new Set();
+
+  while (steps < limit) {
+    if (prog.tag === "nil") {
+      return { status: "halts", steps, head, ones, lo, hi, stuckId: null };
+    }
+    if (prog.tag === "gap") {
+      return { status: "stuck", steps, head, ones, lo, hi, stuckId: ids[0] ?? 0 };
+    }
+    const stateKey = `${head}|${[...ones].sort((a,b)=>a-b).join(",")}|${progKey(prog)}`;
+    if (seen.has(stateKey)) {
+      return { status: "diverges", steps, head, ones, lo, hi, stuckId: null, reason: "цикл конфигураций" };
+    }
+    seen.add(stateKey);
+
+    const headBit = ones.has(head);
+    if (prog.tag === "left") {
+      head--; prog = prog.p;
+    } else if (prog.tag === "right") {
+      head++; prog = prog.p;
+    } else if (prog.tag === "flip") {
+      if (headBit) ones.delete(head); else ones.add(head);
+      prog = prog.p;
+    } else if (prog.tag === "loop") {
+      const nb = numGaps(prog.b);
+      if (headBit) {
+        ids = ids.slice(0, nb).concat(ids);
+        prog = append(prog.b, P.loop(prog.b, prog.p));
+      } else {
+        ids = ids.slice(nb);
+        prog = prog.p;
+      }
+    }
+    if (head < lo) lo = head;
+    if (head > hi) hi = head;
+    steps++;
+  }
+  return { status: "diverges", steps, head, ones, lo, hi, stuckId: null, reason: `> ${limit} шагов` };
+}
+
+// ---------- Дерево узлов UI ----------
+let rootNode = null;
+let nextNodeId = 1;
+
+function createNode(prog) {
+  const limit = Math.max(10, parseInt($("inpLimit").value, 10) || 300);
+  const sim = simulate(prog, limit);
+  const ng = numGaps(prog);
+  // какой индекс дырки по умолчанию раскрываем при клике на карточку:
+  const defaultGap = $("chkTNF").checked ? sim.stuckId : (sim.stuckId !== null ? sim.stuckId : (ng > 0 ? 0 : null));
+  return {
+    id: nextNodeId++,
+    prog,
+    sim,
+    numGaps: ng,
+    expandedGap: null,
+    defaultGap,
+    children: null,
+  };
+}
+
+function toggleExpandNode(node, gapIdx) {
+  const useTNF = $("chkTNF").checked;
+  if (useTNF && (node.sim.status === "halts" || node.sim.status === "diverges") && gapIdx === undefined) {
+    inspectNode(node);
+    return;
+  }
+  const targetGap = gapIdx !== undefined ? gapIdx : node.defaultGap;
+  if (targetGap === null || targetGap === undefined) {
+    inspectNode(node);
+    return;
+  }
+  // Если уже раскрыта эта же дырка — сворачиваем
+  if (node.children && node.expandedGap === targetGap) {
+    node.children = null;
+    node.expandedGap = null;
+  } else {
+    const cs = expandProg(targetGap, node.prog);
+    if (cs && cs.length > 0) {
+      node.expandedGap = targetGap;
+      node.children = cs.map(c => createNode(c));
+    }
+  }
+  inspectNode(node);
+  renderAll();
+}
+
+// Отрисовка токенов программы с кликабельными дырками ?_k
+function renderProgTokens(node) {
+  const wrap = document.createElement("div");
+  wrap.className = "prog-code";
+  let gapCounter = 0;
+
+  function walk(p) {
+    switch (p.tag) {
+      case "nil": return;
+      case "left":
+      case "right":
+      case "flip": {
+        const s = document.createElement("span");
+        s.className = "tok-cmd";
+        s.textContent = p.tag === "left" ? "<" : p.tag === "right" ? ">" : "*";
+        wrap.appendChild(s);
+        walk(p.p);
+        return;
+      }
+      case "loop": {
+        const b1 = document.createElement("span");
+        b1.className = "tok-br"; b1.textContent = "[";
+        wrap.appendChild(b1);
+        walk(p.b);
+        const b2 = document.createElement("span");
+        b2.className = "tok-br"; b2.textContent = "]";
+        wrap.appendChild(b2);
+        walk(p.p);
+        return;
+      }
+      case "gap": {
+        const idx = gapCounter++;
+        const g = document.createElement("span");
+        const isActive = node.sim.stuckId === idx;
+        g.className = "tok-gap" + (isActive ? " active" : "");
+        g.innerHTML = `?<sub>${p.k}</sub>`;
+        g.title = isActive
+          ? `Дырка #${idx} (длина ${p.k}) — сюда упёрся симулятор на шаге ${node.sim.steps}. Кликни, чтобы раскрыть`
+          : `Дырка #${idx} (длина ${p.k}, не достигнута). Кликни, чтобы принудительно раскрыть её`;
+        g.addEventListener("click", e => {
+          e.stopPropagation();
+          toggleExpandNode(node, idx);
+        });
+        wrap.appendChild(g);
+        walk(p.p);
+        return;
+      }
+    }
+  }
+
+  if (node.prog.tag === "nil") {
+    const s = document.createElement("span");
+    s.className = "tok-br";
+    s.textContent = "ε";
+    wrap.appendChild(s);
+  } else {
+    walk(node.prog);
+  }
+  return wrap;
+}
+
+function renderTreeDOM(node) {
+  const li = document.createElement("li");
+  const card = document.createElement("div");
+  card.className = `node-card status-${node.sim.status}` + (node.children ? " expanded" : "");
+
+  card.appendChild(renderProgTokens(node));
+
+  const meta = document.createElement("div");
+  meta.className = "node-meta";
+  if (node.sim.status === "halts") {
+    const b = document.createElement("span");
+    b.className = "badge-halts";
+    b.textContent = `⇓ ${node.sim.steps}`;
+    meta.appendChild(b);
+  } else if (node.sim.status === "diverges") {
+    const b = document.createElement("span");
+    b.className = "badge-div";
+    b.textContent = `⇑`;
+    b.title = node.sim.reason || "не останавливается";
+    meta.appendChild(b);
+  } else if (node.sim.status === "stuck") {
+    const b = document.createElement("span");
+    b.className = "badge-stuck";
+    b.textContent = `шаг ${node.sim.steps} → #${node.sim.stuckId}`;
+    meta.appendChild(b);
+    const info = gapInfo("none", node.sim.stuckId, node.prog);
+    if (info && info.prev !== "none") {
+      const p = document.createElement("span");
+      p.className = "badge-prev";
+      p.textContent = `после ${info.prev === "left" ? "<" : ">"}`;
+      meta.appendChild(p);
+    }
+  }
+  card.appendChild(meta);
+
+  card.addEventListener("click", () => toggleExpandNode(node));
+  card.addEventListener("mouseenter", () => inspectNode(node));
+  li.appendChild(card);
+
+  if (node.children && node.children.length > 0) {
+    const ul = document.createElement("ul");
+    for (const ch of node.children) {
+      ul.appendChild(renderTreeDOM(ch));
+    }
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function inspectNode(node) {
+  const el = $("inspector");
+  const codeStr = progKey(node.prog) || "ε";
+  let ruleDesc = "";
+  const target = node.sim.stuckId !== null ? node.sim.stuckId : 0;
+  const info = gapInfo("none", target, node.prog);
+  if (info) {
+    const qns = noShift(node.prog);
+    const useNS = $("chkNoShift").checked && qns;
+    const useNC = $("chkNoCancel").checked;
+    const notes = [];
+    if (useNS) notes.push("нет сдвигов (<code>noShift</code>) ⇒ ветка <code>&gt;</code> отсечена");
+    if (useNC && info.prev === "left") notes.push("перед дыркой <code>&lt;</code> ⇒ ветка <code>&gt;</code> отсечена");
+    if (useNC && info.prev === "right") notes.push("перед дыркой <code>&gt;</code> ⇒ ветка <code>&lt;</code> отсечена");
+    ruleDesc = notes.length ? ` | Правила: ${notes.join("; ")}` : " | Правила: доступны все ветки";
+  }
+
+  // Мини-лента
+  const lo = Math.min(-2, node.sim.lo);
+  const hi = Math.max(2, node.sim.hi);
+  let tapeHtml = '<span class="mini-tape">';
+  for (let i = lo; i <= hi; i++) {
+    const isOne = node.sim.ones.has(i);
+    const isHead = i === node.sim.head;
+    tapeHtml += `<span class="mini-cell${isOne ? " one" : ""}${isHead ? " head" : ""}" title="клетка ${i}">${isOne ? 1 : 0}</span>`;
+  }
+  tapeHtml += "</span>";
+
+  let statusText = "";
+  if (node.sim.status === "halts") {
+    statusText = `<span class="badge-halts">Остановилась за ${node.sim.steps} шаг. (⇓ ${node.sim.steps})</span>`;
+  } else if (node.sim.status === "diverges") {
+    statusText = `<span class="badge-div">Зациклилась / не останавливается (⇑, ${node.sim.reason})</span>`;
+  } else {
+    statusText = `<span class="badge-stuck">Упёрлась в дырку #${node.sim.stuckId} на шаге ${node.sim.steps}</span>`;
+  }
+
+  el.innerHTML = `<span>Узел: <code><b>${codeStr}</b></code></span> <span>${statusText}</span> <span>Лента: ${tapeHtml}</span> <span>${ruleDesc}</span>`;
+}
+
+function updateStats() {
+  let nodes = 0, expanded = 0, halted = 0, div = 0, stuck = 0, best = -1;
+  function walk(n) {
+    nodes++;
+    if (n.children) {
+      expanded++;
+      n.children.forEach(walk);
+    } else {
+      if (n.sim.status === "halts") {
+        halted++;
+        if (n.sim.steps > best) best = n.sim.steps;
+      } else if (n.sim.status === "diverges") {
+        div++;
+      } else {
+        stuck++;
+      }
+    }
+  }
+  if (rootNode) walk(rootNode);
+  $("stNodes").textContent = nodes;
+  $("stExpanded").textContent = expanded;
+  $("stHalted").textContent = halted;
+  $("stDiv").textContent = div;
+  $("stStuck").textContent = stuck;
+  $("stBest").textContent = best >= 0 ? best : "—";
+}
+
+function renderAll() {
+  const rootEl = $("treeRoot");
+  rootEl.innerHTML = "";
+  if (rootNode) {
+    const ul = document.createElement("ul");
+    ul.style.paddingTop = "0";
+    ul.appendChild(renderTreeDOM(rootNode));
+    rootEl.appendChild(ul);
+  }
+  updateStats();
+}
+
+function resetTree() {
+  const m = Math.max(0, Math.min(15, parseInt($("inpM").value, 10) || 0));
+  nextNodeId = 1;
+  rootNode = createNode(P.gap(m));
+  inspectNode(rootNode);
+  renderAll();
+}
+
+function stepOneLevel() {
+  const leaves = [];
+  function collect(n) {
+    if (n.children) n.children.forEach(collect);
+    else if (n.sim.status === "stuck" && n.defaultGap !== null) leaves.push(n);
+  }
+  if (rootNode) collect(rootNode);
+  for (const lf of leaves) {
+    const cs = expandProg(lf.defaultGap, lf.prog);
+    if (cs && cs.length > 0) {
+      lf.expandedGap = lf.defaultGap;
+      lf.children = cs.map(c => createNode(c));
+    }
+  }
+  renderAll();
+}
+
+function expandAllTree() {
+  let budget = 2500; // защита от зависания браузера на больших m
+  function expandRec(n) {
+    if (budget <= 0) return;
+    if (!n.children && n.sim.status === "stuck" && n.defaultGap !== null) {
+      const cs = expandProg(n.defaultGap, n.prog);
+      if (cs && cs.length > 0) {
+        budget -= cs.length;
+        n.expandedGap = n.defaultGap;
+        n.children = cs.map(c => createNode(c));
+      }
+    }
+    if (n.children) n.children.forEach(expandRec);
+  }
+  if (rootNode) expandRec(rootNode);
+  renderAll();
+}
+
+$("btnReset").addEventListener("click", resetTree);
+$("inpM").addEventListener("change", resetTree);
+$("inpLimit").addEventListener("change", resetTree);
+$("btnStepAll").addEventListener("click", stepOneLevel);
+$("btnExpandAll").addEventListener("click", expandAllTree);
+
+resetTree();
+</script>
+</body>
+</html>
