@@ -146,21 +146,21 @@ theorem longest_concat {os : List Outcome} {x : Nat × Program} :
 end Outcome
 
 /-- Settle `q` with the decider, expanding a gap whenever execution gets stuck on it. -/
-def search (e : Expander) (d : Decider) (q : Program) : Outcome :=
-  match d q with
+def search {T : Type} [Tape T] (e : Expander) (d : Decider T) (q : Program) : Outcome :=
+  match d.run q with
   | .halts t _  => ⟨[], some (t, q)⟩
   | .diverges _ => ∅
   | .stuck i    =>
     .concat ((e.expand q i).attach.map fun c => search e d c.1)
-  | .unknown    => ⟨[q], none⟩
+  | .unknown _  => ⟨[q], none⟩
 termination_by ‖q‖°
 decreasing_by exact e.decreasing c.2
 
-theorem search_bounded {e : Expander} {d : Decider} {B : Nat} (q : Program) :
+theorem search_bounded {T : Type} [Tape T] {e : Expander} {d : Decider T} {B : Nat} (q : Program) :
     (∀ r ∈ (search e d q).holdouts, Bounded B r) → (search e d q).Below B → Bounded B q := by
   intro hh hb
   rw [search] at hh hb
-  cases hv : d q with
+  cases hv : d.run q with
   | halts t hq =>
     rw [hv] at hb
     exact Bounded.of_halts hq (hb (t, q) rfl)
@@ -173,17 +173,17 @@ theorem search_bounded {e : Expander} {d : Decider} {B : Nat} (q : Program) :
       rw [Outcome.holdouts_concat]
       exact List.mem_flatMap.mpr ⟨_, List.mem_map.mpr ⟨⟨c, hc⟩, List.mem_attach _ _, rfl⟩, hr⟩
     · exact Outcome.below_concat hb _ (List.mem_map.mpr ⟨⟨c, hc⟩, List.mem_attach _ _, rfl⟩)
-  | unknown =>
+  | unknown _ =>
     rw [hv] at hh
     exact hh q (List.mem_singleton_self _)
 termination_by ‖q‖°
 decreasing_by exact e.decreasing hc
 
-theorem search_longest {e : Expander} {d : Decider} {t : Nat} {c : Program} (q : Program) :
+theorem search_longest {T : Type} [Tape T] {e : Expander} {d : Decider T} {t : Nat} {c : Program} (q : Program) :
     (search e d q).longest = some (t, c) → c ⇓ t ∧ ‖c‖ = ‖q‖ := by
   intro h
   rw [search] at h
-  cases hv : d q with
+  cases hv : d.run q with
   | halts s hq =>
     rw [hv] at h
     cases h
@@ -195,7 +195,7 @@ theorem search_longest {e : Expander} {d : Decider} {t : Nat} {c : Program} (q :
     obtain ⟨⟨c', hc'⟩, _, rfl⟩ := List.mem_map.mp ho
     obtain ⟨ht, hs⟩ := search_longest (e := e) (d := d) c' h'
     exact ⟨ht, hs.trans (e.size hc')⟩
-  | unknown => rw [hv] at h; exact nomatch h
+  | unknown _ => rw [hv] at h; exact nomatch h
 termination_by ‖q‖°
 decreasing_by exact e.decreasing hc'
 
@@ -230,7 +230,7 @@ end Program
 
 /-- A search from `n?` that settles every program and finds `B` as its longest halt
 proves that `BB(n) = B`. -/
-theorem IsBB.of_search (e : Expander) (d : Decider) {n B : Nat} :
+theorem IsBB.of_search {T : Type} [Tape T] (e : Expander) (d : Decider T) {n B : Nat} :
     (search e d (ω n)).value? = some B → IsBB n B := by
   intro h
   simp only [Outcome.value?] at h

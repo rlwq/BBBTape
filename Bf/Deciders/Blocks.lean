@@ -319,10 +319,10 @@ theorem check_sound {B T limit : Nat} {q : Program} :
 
 end Blocks
 
-def Decider.blocks (B T limit : Nat) : Decider := fun q =>
-  if h : Blocks.check B T limit q then .diverges (Blocks.check_sound h) else .unknown
+def Decider.blocks {T : Type} [Tape T] (B T' limit : Nat) : Decider T :=
+  Decider.ofDiverges (Blocks.check B T' limit) Blocks.check_sound
 
-def Decider.blocksUpTo (limit : Nat) : Decider :=
+def Decider.blocksUpTo {T : Type} [Tape T] (limit : Nat) : Decider T :=
   any ((List.range 3).flatMap fun (b : Nat) =>
     (List.range 3).map fun (t : Nat) => blocks (b + 1) (t + 2) limit)
 

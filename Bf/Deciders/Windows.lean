@@ -230,7 +230,7 @@ theorem check_sound {m fuel : Nat} {q : Program} :
 
 end Windows
 
-def Decider.windows (m fuel : Nat) : Decider := fun q =>
-  if h : Windows.check m fuel q then .diverges (Windows.check_sound h) else .unknown
+def Decider.windows {T : Type} [Tape T] (m fuel : Nat) : Decider T :=
+  Decider.ofDiverges (Windows.check m fuel) Windows.check_sound
 
 end Bf

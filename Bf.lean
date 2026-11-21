@@ -4,6 +4,7 @@ import Bf.Core.Refines
 import Bf.Core.Machine
 import Bf.Core.Statement
 import Bf.Core.Mirror
+import Bf.Core.Trace
 import Bf.Core.Decider
 import Bf.Core.Expander
 import Bf.Core.Search
