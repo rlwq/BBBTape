@@ -33,10 +33,10 @@ jobs:
       - name: Check axioms
         run: |
           output=$({
-            echo "import Bf"
-            for f in $(ls Bf/Results/BB*.lean | sort -V); do
+            echo "import BBBTape"
+            for f in $(ls BBBTape/Results/BB*.lean | sort -V); do
               n=$(basename "$f" .lean | tr 'A-Z' 'a-z')
-              echo "#print axioms Bf.$n"
+              echo "#print axioms BBBTape.$n"
             done
           } | lake env lean --stdin)
           echo "$output"

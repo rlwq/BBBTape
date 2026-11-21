@@ -1,6 +1,6 @@
-name = "bf"
-defaultTargets = ["Bf"]
+name = "BBBTape"
+defaultTargets = ["BBBTape"]
 
 [[lean_lib]]
-name = "Bf"
+name = "BBBTape"
 precompileModules = true

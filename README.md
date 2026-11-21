@@ -27,12 +27,12 @@ For the full write-up and explanation of the formalisation, Tree Normal Form sea
 
 ## Structure
 
-- `Bf/Core/` — language AST, tape interface, operational semantics, Busy Beaver statement, refinement, decider/expander interfaces, and TNF search
-- `Bf/Tapes/` — concrete tape implementations (`Spec`, `Zipper`)
-- `Bf/Deciders/` — sound deciders (`Simulator`, `Windows`, `Translated`, `Blocks`) and decider chains (`Ξ₁`, `Ξ₂`)
-- `Bf/Expanders/` — Tree Normal Form expander (`TNF` / `Φ₁`)
-- `Bf/Macro/` — `bf"..."` syntax macro
-- `Bf/Results/` — proved theorems `bb0` through `bb14`
+- `BBBTape/Core/` — language AST, tape interface, operational semantics, Busy Beaver statement, refinement, decider/expander interfaces, and TNF search
+- `BBBTape/Tapes/` — concrete tape implementations (`Spec`, `Zipper`, `WordTape`)
+- `BBBTape/Deciders/` — sound deciders (`Simulator`, `Windows`, `Translated`, `Blocks`) and decider chains (`Ξ₁`, `Ξ₂`)
+- `BBBTape/Expanders/` — Tree Normal Form expander (`TNF` / `Φ₁`)
+- `BBBTape/Macro/` — `bf"..."` syntax macro
+- `BBBTape/Results/` — proved theorems `bb0` through `bb14`
 
 ## Verify locally
 
