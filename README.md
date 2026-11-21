@@ -1,0 +1,43 @@
+# BBBTape
+
+[![Lean CI](https://github.com/rlwq/BBBTape/actions/workflows/ci.yml/badge.svg)](https://github.com/rlwq/BBBTape/actions/workflows/ci.yml)
+
+Lean 4 formalisation and machine-checked proofs of Busy Beaver values for a binary tape machine with loops (`< > * [ ]`).
+
+For the full write-up and explanation of the formalisation, Tree Normal Form search, and deciders, see the blog post: **[Busy Beaver for a binary tape machine](https://rlwq.github.io/blog/busy-beaver-binary-tape/)**.
+
+## Verified values
+
+| $n$ | Programs | $\mathrm{BB}(n)$ | Champion |
+| ---: | ---: | ---: | --- |
+| 1 | 3 | 1 | `<` |
+| 2 | 10 | 2 | `<<` |
+| 3 | 36 | 3 | `<<<` |
+| 4 | 137 | 4 | `<<<<` |
+| 5 | 543 | 5 | `<<<<<` |
+| 6 | 2,219 | 8 | `*<*[>]` |
+| 7 | 9,285 | 10 | `*<*[*>]` |
+| 8 | 39,587 | 14 | `*[<*<*>]` |
+| 9 | 171,369 | 18 | `*[[<]>>*]` |
+| 10 | 751,236 | 30 | `*[<*[>]<<]` |
+| 11 | 3,328,218 | 35 | `*[<*[>]*<<]` |
+| 12 | 14,878,455 | 72 | `*[<*[>>*>]<]` |
+| 13 | 67,030,785 | 120 | `*[<*<*[>*>]<]` |
+| 14 | 304,036,170 | 158 | `*[<<*[>>>*>]<]` |
+
+## Structure
+
+- `Bf/Core/` — language AST, tape interface, operational semantics, Busy Beaver statement, refinement, decider/expander interfaces, and TNF search
+- `Bf/Tapes/` — concrete tape implementations (`Spec`, `Zipper`)
+- `Bf/Deciders/` — sound deciders (`Simulator`, `Windows`, `Translated`, `Blocks`) and decider chains (`Ξ₁`, `Ξ₂`)
+- `Bf/Expanders/` — Tree Normal Form expander (`TNF` / `Φ₁`)
+- `Bf/Macro/` — `bf"..."` syntax macro
+- `Bf/Results/` — proved theorems `bb0` through `bb14`
+
+## Verify locally
+
+Requires [elan](https://github.com/leanprover/elan) (toolchain is pinned in `lean-toolchain`):
+
+```sh
+lake build
+```
