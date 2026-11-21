@@ -4,3 +4,7 @@ defaultTargets = ["Bf"]
 [[lean_lib]]
 name = "Bf"
 precompileModules = true
+
+[[lean_exe]]
+name = "bench"
+root = "Bench"
