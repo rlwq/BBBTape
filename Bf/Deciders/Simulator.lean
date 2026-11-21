@@ -1,4 +1,4 @@
-import Bf.Decider
+import Bf.Core.Decider
 
 namespace Bf
 

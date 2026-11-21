@@ -1,6 +1,6 @@
 import Std.Data.HashSet
-import Bf.Decider
-import Bf.Zipper
+import Bf.Core.Decider
+import Bf.Tapes.Zipper
 
 namespace Bf
 

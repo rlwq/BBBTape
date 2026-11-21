@@ -1,4 +1,4 @@
-import Bf.Tape
+import Bf.Core.Tape
 
 namespace Bf
 

@@ -1,4 +1,4 @@
-import Bf.Program
+import Bf.Core.Program
 
 namespace Bf
 
@@ -58,6 +58,17 @@ theorem mirror {p q : Program} : p ⊑ q → p.mirror ⊑ q.mirror := by
     exact .gap (by rw [size_mirror, hk]) ihp
 
 end Refines
+
+theorem refines_gap? {s : Program} {k : Nat} : s° → ‖s‖ = k → s ⊑ ω k := by
+  intro hs hk
+  cases k with
+  | zero => rw [size_eq_zero_of_closed hs hk]; exact .nil
+  | succ k => simpa [gap?] using Refines.gap (h := Nat.succ_pos k) hk .nil
+
+theorem refines_rep (f : Program → Program) (hf : ∀ {p q : Program}, p ⊑ q → f p ⊑ f q) :
+    ∀ {n : Nat} {p q : Program}, p ⊑ q → rep f n p ⊑ rep f n q
+  | 0,     _, _, h => h
+  | _ + 1, _, _, h => hf (refines_rep f hf h)
 
 end Program
 

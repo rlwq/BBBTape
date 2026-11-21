@@ -1,66 +1,11 @@
-import Bf.Mirror
+import Bf.Core.Expander
+import Bf.Core.Mirror
 
 namespace Bf
 
 namespace Program
 
 open scoped Program Machine
-
-theorem closed_append {p q : Program} : p° → q° → (p ++ q)° := by
-  intro hp hq
-  induction p with
-  | nil => exact hq
-  | left _ ih | right _ ih | flip _ ih => exact ih hp
-  | loop _ _ _ ihp => exact ⟨hp.1, ihp hp.2⟩
-  | gap => exact absurd hp id
-
-theorem closed_of_append {p q : Program} : (p ++ q)° → p° ∧ q° := by
-  induction p with
-  | nil => exact fun h => ⟨trivial, h⟩
-  | left _ ih | right _ ih | flip _ ih => exact ih
-  | loop _ _ _ ihp => exact fun ⟨hb, hq⟩ => ⟨⟨hb, (ihp hq).1⟩, (ihp hq).2⟩
-  | gap => exact fun h => absurd h id
-
-theorem size_eq_zero_of_closed {p : Program} : p° → ‖p‖ = 0 → p = ε := by
-  intro hp hs
-  cases p with
-  | nil => rfl
-  | gap => exact absurd hp id
-  | _ => simp [size] at hs
-
-theorem refines_gap? {s : Program} {k : Nat} : s° → ‖s‖ = k → s ⊑ gap? k := by
-  intro hs hk
-  cases k with
-  | zero => rw [size_eq_zero_of_closed hs hk]; exact .nil
-  | succ k => simpa [gap?] using Refines.gap (h := Nat.succ_pos k) hk .nil
-
-def rep (f : Program → Program) : Nat → Program → Program
-  | 0,     r => r
-  | n + 1, r => f (rep f n r)
-
-theorem rep_append (f : Program → Program) (hf : ∀ p q, f p ++ q = f (p ++ q)) :
-    ∀ n p q, rep f n p ++ q = rep f n (p ++ q)
-  | 0,     _, _ => rfl
-  | n + 1, p, q => by simp [rep, hf, rep_append f hf n]
-
-theorem size_rep (f : Program → Program) (hf : ∀ p, ‖f p‖ = ‖p‖ + 1) :
-    ∀ n r, ‖rep f n r‖ = n + ‖r‖
-  | 0,     _ => by simp [rep]
-  | n + 1, r => by simp [rep, hf, size_rep f hf n]; omega
-
-theorem closed_rep (f : Program → Program) (hf : ∀ p, p° → (f p)°) :
-    ∀ {n r}, r° → (rep f n r)°
-  | 0,     _, hr => hr
-  | _ + 1, _, hr => hf _ (closed_rep f hf hr)
-
-theorem refines_rep (f : Program → Program) (hf : ∀ {p q : Program}, p ⊑ q → f p ⊑ f q) :
-    ∀ {n : Nat} {p q : Program}, p ⊑ q → rep f n p ⊑ rep f n q
-  | 0,     _, _, h => h
-  | _ + 1, _, _, h => hf (refines_rep f hf h)
-
-theorem mirror_rep_right : ∀ n r, (rep .right n r).mirror = rep .left n r.mirror
-  | 0,     _ => rfl
-  | n + 1, r => by simp [rep, mirror, mirror_rep_right n]
 
 def shiftTape (t : SpecTape) (δ : Int) : SpecTape := fun i => t (i + δ)
 
@@ -517,16 +462,16 @@ theorem runExpand_cover {p q : Program} (i : Fin q.numGaps) :
     obtain ⟨p', hp', hp'c, hcp⟩ := hsubc s₁ s₂ s' c hs' hs'c hcs
     exact ⟨q[i.val ↦ c], List.mem_map.mpr ⟨c, hc, rfl⟩, p', hp', hp'c, Congr.equiv hse hcp⟩
 
-theorem gapSum_rep_left : ∀ (m : Nat) (c : Program), (rep .left m c).gapSum = c.gapSum
+theorem gapSum_rep_left : ∀ (m : Nat) (c : Program), ‖rep .left m c‖° = ‖c‖°
   | 0,     _ => rfl
   | m + 1, c => by simp [rep, gapSum, gapSum_rep_left m c]
 
-theorem gapSum_rep_right : ∀ (m : Nat) (c : Program), (rep .right m c).gapSum = c.gapSum
+theorem gapSum_rep_right : ∀ (m : Nat) (c : Program), ‖rep .right m c‖° = ‖c‖°
   | 0,     _ => rfl
   | m + 1, c => by simp [rep, gapSum, gapSum_rep_right m c]
 
 theorem gapSum_nonShiftShapes {r : Nat} {c : Program} :
-    c ∈ nonShiftShapes r → c.gapSum ≤ r - 1 := by
+    c ∈ nonShiftShapes r → ‖c‖° ≤ r - 1 := by
   intro hc
   unfold nonShiftShapes at hc
   split at hc
@@ -538,7 +483,7 @@ theorem gapSum_nonShiftShapes {r : Nat} {c : Program} :
 
 /-- Every shape fixes at least one command, so its gaps are strictly smaller than the gap it fills. -/
 theorem gapSum_shapes {noShift : Bool} {k : Nat} {c : Program} :
-    0 < k → c ∈ shapes noShift k → c.gapSum < k := by
+    0 < k → c ∈ shapes noShift k → ‖c‖° < k := by
   intro hk hc
   unfold shapes at hc
   split at hc
@@ -557,7 +502,7 @@ theorem gapSum_shapes {noShift : Bool} {k : Nat} {c : Program} :
     · have := gapSum_nonShiftShapes hns; omega
 
 theorem runExpand_decreasing {q c : Program} {i : Fin q.numGaps} :
-    c ∈ runExpand q i → c.gapSum < q.gapSum := by
+    c ∈ runExpand q i → ‖c‖° < ‖q‖° := by
   intro hc
   obtain ⟨s, hs, rfl⟩ := List.mem_map.mp hc
   have h₀ := gapSize?_pos (gapSize?_eq_some q i)
@@ -565,15 +510,45 @@ theorem runExpand_decreasing {q c : Program} {i : Fin q.numGaps} :
   have h₂ := gapSum_shapes h₀ hs
   omega
 
-end Program
+theorem size_nonShiftShapes {r : Nat} {c : Program} :
+    c ∈ nonShiftShapes r → ‖c‖ = r := by
+  intro hc
+  unfold nonShiftShapes at hc
+  split at hc
+  · simp only [List.mem_singleton] at hc; subst hc; simp [size]; omega
+  · simp only [List.mem_append, List.mem_singleton, List.mem_map, List.mem_range] at hc
+    rcases hc with rfl | ⟨a, ha, rfl⟩
+    · simp [size]; omega
+    · simp [size]; omega
 
-open scoped Program in
-structure Expander where
-  expand     : (q : Program) → Fin q.numGaps → List Program
-  cover      : ∀ {p q : Program} (i : Fin q.numGaps),
-    p° → p ⊑ q → ∃ c ∈ expand q i, ∃ p', p'° ∧ p' ⊑ c ∧ p ~ p'
-  /-- Every child is strictly less unknown than its parent, so expansion cannot go on forever. -/
-  decreasing : ∀ {q c : Program} {i : Fin q.numGaps}, c ∈ expand q i → c.gapSum < q.gapSum
+theorem size_shapes {noShift : Bool} {k : Nat} {c : Program} :
+    c ∈ shapes noShift k → ‖c‖ = k := by
+  intro hc
+  unfold shapes at hc
+  split at hc
+  · simp only [List.mem_singleton] at hc; subst hc; simp [size]; omega
+  · simp only [List.mem_append] at hc
+    rcases hc with (hls | hrs) | hns
+    · simp only [List.mem_flatMap, List.mem_range, List.mem_map] at hls
+      obtain ⟨i, hi, d, hd, rfl⟩ := hls
+      rw [size_rep .left (fun _ => rfl), size_nonShiftShapes hd]; omega
+    · cases noShift
+      · simp only [Bool.false_eq_true, ↓reduceIte, List.mem_flatMap, List.mem_range,
+          List.mem_map] at hrs
+        obtain ⟨i, hi, d, hd, rfl⟩ := hrs
+        rw [size_rep .right (fun _ => rfl), size_nonShiftShapes hd]; omega
+      · simp at hrs
+    · exact size_nonShiftShapes hns
+
+theorem runExpand_size {q c : Program} {i : Fin q.numGaps} :
+    c ∈ runExpand q i → ‖c‖ = ‖q‖ := by
+  intro hc
+  obtain ⟨s, hs, rfl⟩ := List.mem_map.mp hc
+  have := size_subst s (gapSize?_eq_some q i)
+  have := size_shapes hs
+  omega
+
+end Program
 
 namespace Expander
 
@@ -581,7 +556,10 @@ def tnf : Expander where
   expand     := Program.runExpand
   cover      := Program.runExpand_cover
   decreasing := Program.runExpand_decreasing
+  size       := Program.runExpand_size
 
 end Expander
+
+abbrev Φ₁ : Expander := .tnf
 
 end Bf

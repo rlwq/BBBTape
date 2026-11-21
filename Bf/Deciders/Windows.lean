@@ -1,5 +1,5 @@
-import Bf.Decider
-import Bf.Zipper
+import Bf.Core.Decider
+import Bf.Tapes.Zipper
 
 namespace Bf
 
@@ -8,13 +8,6 @@ namespace Windows
 open scoped Program Machine
 
 def win (n : Nat) (l : List Bool) : List Bool := (List.range n).map fun (k : Nat) => l.getD k false
-
-theorem win_drop (n k : Nat) (l : List Bool) :
-    win n (l.drop k) = (List.range n).map fun (i : Nat) => l.getD (k + i) false := by
-  unfold win
-  congr 1
-  funext i
-  simp [List.getD_eq_getElem?_getD, List.getElem?_drop]
 
 theorem win_succ_cons (m : Nat) (h : Bool) (l : List Bool) :
     win (m + 1) (h :: l) = h :: win m l := by

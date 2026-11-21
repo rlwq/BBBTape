@@ -1,6 +1,6 @@
-import Bf.Tape
-import Bf.Program
-import Bf.Refines
+import Bf.Core.Tape
+import Bf.Core.Program
+import Bf.Core.Refines
 
 namespace Bf
 

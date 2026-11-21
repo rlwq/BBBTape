@@ -1,5 +1,5 @@
-import Bf.Mirror
-import Bf.Zipper
+import Bf.Core.Decider
+import Bf.Tapes.Zipper
 
 namespace Bf
 

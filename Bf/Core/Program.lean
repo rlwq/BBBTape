@@ -117,7 +117,10 @@ def gapSum : Program → Nat
   | loop b p => b.gapSum + p.gapSum
   | gap k _ p => k + p.gapSum
 
-@[simp] theorem gapSum_append (p q : Program) : (p ++ q).gapSum = p.gapSum + q.gapSum := by
+/-- How much of `p` is still unknown, so that `p°` means `‖p‖° = 0`. -/
+scoped notation:max "‖" p "‖°" => Program.gapSum p
+
+@[simp] theorem gapSum_append (p q : Program) : ‖p ++ q‖° = ‖p‖° + ‖q‖° := by
   induction p with
   | nil => simp [gapSum]
   | left _ ih | right _ ih | flip _ ih | loop _ _ _ ih | gap _ _ _ ih =>
@@ -139,7 +142,7 @@ theorem gapSize?_pos {i k : Nat} {q : Program} : gapSize? i q = some k → 0 < k
     | succ j => simp only [gapSize?] at h; exact ih h
 
 theorem gapSum_subst (s : Program) {i k : Nat} {q : Program} :
-    gapSize? i q = some k → (subst i s q).gapSum + k = q.gapSum + s.gapSum := by
+    gapSize? i q = some k → ‖q[i ↦ s]‖° + k = ‖q‖° + ‖s‖° := by
   intro h
   induction q generalizing i with
   | nil => simp [gapSize?] at h
@@ -171,15 +174,52 @@ theorem gapSum_subst (s : Program) {i k : Nat} {q : Program} :
       simp only [subst, gapSum]
       omega
 
+theorem size_subst (s : Program) {i k : Nat} {q : Program} :
+    gapSize? i q = some k → (subst i s q).size + k = q.size + s.size := by
+  intro h
+  induction q generalizing i with
+  | nil => simp [gapSize?] at h
+  | left p ih | right p ih | flip p ih =>
+    simp only [gapSize?] at h
+    have := ih h
+    simp only [subst, size]
+    omega
+  | loop b p ihb ihp =>
+    simp only [gapSize?] at h
+    split at h
+    · next hi =>
+      have := ihb h
+      simp only [subst, hi, ↓reduceIte, size]
+      omega
+    · next hi =>
+      have := ihp h
+      simp only [subst, hi, ↓reduceIte, size]
+      omega
+  | gap m _ p ih =>
+    cases i with
+    | zero =>
+      simp only [gapSize?, Option.some.injEq] at h
+      subst h
+      simp only [subst, size, size_append]
+      omega
+    | succ j =>
+      simp only [gapSize?] at h
+      have := ih h
+      simp only [subst, size]
+      omega
+
 /-- A gap of size `k`, or nothing at all when `k = 0`: gaps are never empty. -/
 def gap? : Nat → Program
   | 0     => ε
   | k + 1 => gap (k + 1) (Nat.succ_pos k) ε
 
-@[simp] theorem gapSum_gap? (k : Nat) : (gap? k).gapSum = k := by
+/-- A gap of size `k`. -/
+scoped prefix:max "ω" => Program.gap?
+
+@[simp] theorem gapSum_gap? (k : Nat) : ‖ω k‖° = k := by
   cases k <;> simp [gap?, gapSum]
 
-@[simp] theorem size_gap? (k : Nat) : (gap? k).size = k := by
+@[simp] theorem size_gap? (k : Nat) : ‖ω k‖ = k := by
   cases k <;> simp [gap?, size]
 
 def Closed : Program → Prop
@@ -192,13 +232,12 @@ def Closed : Program → Prop
 
 scoped postfix:max "°" => Closed
 
-instance decidableClosed : (p : Program) → Decidable p.Closed
-  | ε        => isTrue trivial
-  | left p   => decidableClosed p
-  | right p  => decidableClosed p
-  | flip p   => decidableClosed p
-  | loop b p => @instDecidableAnd _ _ (decidableClosed b) (decidableClosed p)
-  | gap _ _ _ => isFalse id
+theorem closed_iff {p : Program} : p° ↔ ‖p‖° = 0 := by
+  induction p with
+  | nil => exact ⟨fun _ => rfl, fun _ => trivial⟩
+  | left _ ih | right _ ih | flip _ ih => exact ih
+  | loop _ _ ihb ihp => simp only [Closed, gapSum, ihb, ihp]; omega
+  | gap _ h _ _ => simp only [Closed, gapSum, false_iff]; omega
 
 def alive : Program → Bool
   | ε       => false
@@ -261,6 +300,51 @@ theorem mirror_eq_self {p : Program} : p.noShift = true → p.mirror = p := by
   | loop _ _ ihb ihp =>
     simp only [noShift, Bool.and_eq_true] at h
     simp [mirror, ihb h.1, ihp h.2]
+
+theorem closed_append {p q : Program} : p° → q° → (p ++ q)° := by
+  intro hp hq
+  induction p with
+  | nil => exact hq
+  | left _ ih | right _ ih | flip _ ih => exact ih hp
+  | loop _ _ _ ihp => exact ⟨hp.1, ihp hp.2⟩
+  | gap => exact absurd hp id
+
+theorem closed_of_append {p q : Program} : (p ++ q)° → p° ∧ q° := by
+  induction p with
+  | nil => exact fun h => ⟨trivial, h⟩
+  | left _ ih | right _ ih | flip _ ih => exact ih
+  | loop _ _ _ ihp => exact fun ⟨hb, hq⟩ => ⟨⟨hb, (ihp hq).1⟩, (ihp hq).2⟩
+  | gap => exact fun h => absurd h id
+
+theorem size_eq_zero_of_closed {p : Program} : p° → ‖p‖ = 0 → p = ε := by
+  intro hp hs
+  cases p with
+  | nil => rfl
+  | gap => exact absurd hp id
+  | _ => simp [size] at hs
+
+def rep (f : Program → Program) : Nat → Program → Program
+  | 0,     r => r
+  | n + 1, r => f (rep f n r)
+
+theorem rep_append (f : Program → Program) (hf : ∀ p q, f p ++ q = f (p ++ q)) :
+    ∀ n p q, rep f n p ++ q = rep f n (p ++ q)
+  | 0,     _, _ => rfl
+  | n + 1, p, q => by simp [rep, hf, rep_append f hf n]
+
+theorem size_rep (f : Program → Program) (hf : ∀ p, ‖f p‖ = ‖p‖ + 1) :
+    ∀ n r, ‖rep f n r‖ = n + ‖r‖
+  | 0,     _ => by simp [rep]
+  | n + 1, r => by simp [rep, hf, size_rep f hf n]; omega
+
+theorem closed_rep (f : Program → Program) (hf : ∀ p, p° → (f p)°) :
+    ∀ {n r}, r° → (rep f n r)°
+  | 0,     _, hr => hr
+  | _ + 1, _, hr => hf _ (closed_rep f hf hr)
+
+theorem mirror_rep_right : ∀ n r, (rep .right n r).mirror = rep .left n r.mirror
+  | 0,     _ => rfl
+  | n + 1, r => by simp [rep, mirror, mirror_rep_right n]
 
 end Program
 

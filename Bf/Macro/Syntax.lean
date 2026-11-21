@@ -1,5 +1,5 @@
 import Lean
-import Bf.Program
+import Bf.Core.Program
 
 namespace Bf
 

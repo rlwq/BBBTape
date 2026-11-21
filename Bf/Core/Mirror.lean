@@ -1,4 +1,5 @@
-import Bf.Decider
+import Bf.Core.Statement
+import Bf.Tapes.Spec
 
 namespace Bf
 
@@ -102,11 +103,5 @@ theorem Program.diverges_of_mirror {q : Program} : q.mirror⇑ → q⇑ := fun h
   have hm : Machine.Mirrored (q.mirror.init SpecTape) (q.init SpecTape) :=
     ⟨(Program.mirror_mirror q).symm, fun (_ : Int) => rfl⟩
   Program.diverges_of (hm.diverges (h SpecTape))
-
-/-- Run `d` on the mirror image; only divergence transfers back, since gap ids are not mirrored. -/
-def Decider.mirror (d : Decider) : Decider := fun q =>
-  match d q.mirror with
-  | .diverges h => .diverges (Program.diverges_of_mirror h)
-  | _           => .unknown
 
 end Bf

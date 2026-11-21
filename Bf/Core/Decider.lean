@@ -1,4 +1,4 @@
-import Bf.Statement
+import Bf.Core.Mirror
 
 namespace Bf
 
@@ -37,16 +37,6 @@ instance : Std.LawfulIdentity (orElse (q := q)) .unknown where
   left_id _  := rfl
   right_id v := by cases v <;> rfl
 
-/-- The number of steps, if the verdict is `halts`. -/
-def steps? : Verdict q → Option Nat
-  | .halts t _ => some t
-  | _          => none
-
-theorem haltsIn_of_steps? {v : Verdict q} {t : Nat} : v.steps? = some t → q ⇓ t := by
-  cases v with
-  | halts s h => intro hs; cases hs; exact h
-  | diverges | stuck | unknown => intro hs; cases hs
-
 end Verdict
 
 /-- A decider is just a function: the proofs travel inside the verdicts. -/
@@ -77,6 +67,12 @@ instance : Std.LawfulIdentity orElse unknown where
 
 def any (ds : List Decider) : Decider :=
   ds.foldr (· <|> ·) unknown
+
+/-- Run `d` on the mirror image; only divergence transfers back, since gap ids are not mirrored. -/
+def mirror (d : Decider) : Decider := fun q =>
+  match d q.mirror with
+  | .diverges h => .diverges (Program.diverges_of_mirror h)
+  | _           => .unknown
 
 end Decider
 
