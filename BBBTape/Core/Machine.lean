@@ -318,6 +318,16 @@ scoped infix:50 " ~ " => Equiv
 
 theorem Equiv.refl (p : Program) : p ~ p := fun _ => Iff.rfl
 
+def Dominates (p q : Program) : Prop :=
+  ∀ k : Nat, (p ⇓ k) → ∃ k' : Nat, k ≤ k' ∧ (q ⇓ k')
+
+scoped infix:50 " ≼ " => Dominates
+
+theorem Dominates.refl (p : Program) : p ≼ p := fun k hk => ⟨k, Nat.le_refl k, hk⟩
+
+theorem Equiv.dominates {p q : Program} (h : p ~ q) : p ≼ q :=
+  fun k hk => ⟨k, Nat.le_refl k, (h k).mp hk⟩
+
 end Program
 
 namespace Program.Refines

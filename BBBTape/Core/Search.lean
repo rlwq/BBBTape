@@ -25,8 +25,9 @@ theorem of_diverges {B : Nat} {q : Program} :
 theorem of_expand {e : Expander} {B : Nat} {q : Program} (i : Fin q.numGaps) :
     (∀ c ∈ e.expand q i, Bounded B c) → Bounded B q := by
   intro hcs p k hp hpq hk
-  obtain ⟨c, hc, p', hp', hp'c, heq⟩ := e.cover i hp hpq
-  exact hcs c hc p' k hp' hp'c ((heq k).mp hk)
+  obtain ⟨c, hc, p', hp', hp'c, hdom⟩ := e.cover i hp hpq
+  obtain ⟨k', hkk', hk'⟩ := hdom k hk
+  exact Nat.le_trans hkk' (hcs c hc p' k' hp' hp'c hk')
 
 theorem upper {B n : Nat} :
     Bounded B (ω n) →
