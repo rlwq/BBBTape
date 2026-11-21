@@ -1,3 +1,4 @@
+import Std.Data.HashSet
 import Bf.Core.Decider
 import Bf.Tapes.Zipper
 
@@ -69,40 +70,40 @@ structure Loc where
   left  : List Bool
   head  : Bool
   right : List Bool
-  deriving DecidableEq
+  deriving DecidableEq, Hashable
 
-def succs (LS RS : List (List Bool)) (s : Loc) : List Loc :=
+def succs (LS RS : Std.HashSet (List Bool)) (s : Loc) : List Loc :=
   match s.prog with
-  | ε        => []
+  | ε          => []
   | .gap _ _ _ => []
-  | .flip p  => [⟨p, s.left, !s.head, s.right⟩]
-  | .loop b q => [⟨if s.head then b ++ .loop b q else q, s.left, s.head, s.right⟩]
-  | .right p =>
-    ([false, true].filter fun (x : Bool) => decide (s.right.tail ++ [x] ∈ RS)).map fun (x : Bool) =>
+  | .flip p    => [⟨p, s.left, !s.head, s.right⟩]
+  | .loop b q  => [⟨if s.head then b ++ .loop b q else q, s.left, s.head, s.right⟩]
+  | .right p   =>
+    ([false, true].filter fun (x : Bool) => RS.contains (s.right.tail ++ [x])).map fun (x : Bool) =>
       ⟨p, s.head :: s.left.dropLast, s.right.headD false, s.right.tail ++ [x]⟩
-  | .left p  =>
-    ([false, true].filter fun (x : Bool) => decide (s.left.tail ++ [x] ∈ LS)).map fun (x : Bool) =>
+  | .left p    =>
+    ([false, true].filter fun (x : Bool) => LS.contains (s.left.tail ++ [x])).map fun (x : Bool) =>
       ⟨p, s.left.tail ++ [x], s.left.headD false, s.head :: s.right.dropLast⟩
 
-def gramOK (LS RS : List (List Bool)) (s : Loc) : Bool :=
+def gramOK (LS RS : Std.HashSet (List Bool)) (s : Loc) : Bool :=
   match s.prog with
-  | .right _ => decide (s.head :: s.left.dropLast ∈ LS)
-  | .left _  => decide (s.head :: s.right.dropLast ∈ RS)
+  | .right _ => LS.contains (s.head :: s.left.dropLast)
+  | .left _  => RS.contains (s.head :: s.right.dropLast)
   | _        => true
 
-def closed (S : List Loc) (LS RS : List (List Bool)) : Bool :=
-  S.all fun (s : Loc) => s.prog.alive && (succs LS RS s).all (· ∈ S) && gramOK LS RS s
+def closed (S : Std.HashSet Loc) (LS RS : Std.HashSet (List Bool)) : Bool :=
+  S.toList.all fun (s : Loc) => s.prog.alive && (succs LS RS s).all S.contains && gramOK LS RS s
 
-def Rep (m : Nat) (S : List Loc) (LS RS : List (List Bool)) (c : Machine Zipper) : Prop :=
+def Rep (m : Nat) (S : Std.HashSet Loc) (LS RS : Std.HashSet (List Bool)) (c : Machine Zipper) : Prop :=
   (⟨c.prog, win (m + 1) c.tape.left, c.tape.head, win (m + 1) c.tape.right⟩ : Loc) ∈ S ∧
   (∀ k : Nat, win (m + 1) (c.tape.left.drop k) ∈ LS) ∧
   (∀ k : Nat, win (m + 1) (c.tape.right.drop k) ∈ RS)
 
-theorem Rep.step {m : Nat} {S : List Loc} {LS RS : List (List Bool)} (hc : closed S LS RS = true)
-    {c : Machine Zipper} (h : Rep m S LS RS c) :
+theorem Rep.step {m : Nat} {S : Std.HashSet Loc} {LS RS : Std.HashSet (List Bool)}
+    (hc : closed S LS RS = true) {c : Machine Zipper} (h : Rep m S LS RS c) :
     ∃ c' : Machine Zipper, c⇒ = some c' ∧ Rep m S LS RS c' := by
   obtain ⟨hS, hL, hR⟩ := h
-  have hcl := List.all_eq_true.mp hc _ hS
+  have hcl := List.all_eq_true.mp hc _ (Std.HashSet.mem_toList.mpr hS)
   simp only [Bool.and_eq_true, List.all_eq_true] at hcl
   obtain ⟨⟨halive, hsucc⟩, hgram⟩ := hcl
   obtain ⟨t, p⟩ := c
@@ -111,18 +112,18 @@ theorem Rep.step {m : Nat} {S : List Loc} {LS RS : List (List Bool)} (hc : close
   | gap => simp [Program.alive] at halive
   | flip p =>
     refine ⟨⟨t.flip, p⟩, rfl, ?_, hL, hR⟩
-    exact of_decide_eq_true (hsucc _ (by simp [succs]; exact ⟨rfl, rfl, rfl⟩))
+    exact Std.HashSet.mem_iff_contains.mpr (hsucc _ (by simp [succs]; exact ⟨rfl, rfl, rfl⟩))
   | loop b q =>
     refine ⟨⟨t, if t.head then b ++ .loop b q else q⟩, rfl, ?_, hL, hR⟩
-    exact of_decide_eq_true (hsucc _ (by simp [succs]))
+    exact Std.HashSet.mem_iff_contains.mpr (hsucc _ (by simp [succs]))
   | right p =>
     refine ⟨⟨t.moveR, p⟩, rfl, ?_, ?_, ?_⟩
-    · apply of_decide_eq_true
+    · apply Std.HashSet.mem_iff_contains.mpr
       apply hsucc
-      simp only [succs, List.mem_map, List.mem_filter, decide_eq_true_eq]
+      simp only [succs, List.mem_map, List.mem_filter]
       refine ⟨t.right.getD (m + 1) false, ⟨by cases t.right.getD (m + 1) false <;> simp, ?_⟩, ?_⟩
       · rw [← win_tail]
-        simpa using hR 1
+        exact Std.HashSet.mem_iff_contains.mp (by simpa using hR 1)
       · show (⟨p, t.head :: (win (m + 1) t.left).dropLast, (win (m + 1) t.right).headD false,
           (win (m + 1) t.right).tail ++ [t.right.getD (m + 1) false]⟩ : Loc) =
           ⟨p, win (m + 1) (t.head :: t.left), t.right.headD false, win (m + 1) t.right.tail⟩
@@ -133,7 +134,7 @@ theorem Rep.step {m : Nat} {S : List Loc} {LS RS : List (List Bool)} (hc : close
       | zero =>
         simp only [List.drop_zero]
         rw [win_cons]
-        simpa [gramOK] using hgram
+        exact Std.HashSet.mem_iff_contains.mpr (by simpa [gramOK] using hgram)
       | succ j =>
         rw [win_cons_drop]
         exact hL j
@@ -143,12 +144,12 @@ theorem Rep.step {m : Nat} {S : List Loc} {LS RS : List (List Bool)} (hc : close
       exact hR (k + 1)
   | left p =>
     refine ⟨⟨t.moveL, p⟩, rfl, ?_, ?_, ?_⟩
-    · apply of_decide_eq_true
+    · apply Std.HashSet.mem_iff_contains.mpr
       apply hsucc
-      simp only [succs, List.mem_map, List.mem_filter, decide_eq_true_eq]
+      simp only [succs, List.mem_map, List.mem_filter]
       refine ⟨t.left.getD (m + 1) false, ⟨by cases t.left.getD (m + 1) false <;> simp, ?_⟩, ?_⟩
       · rw [← win_tail]
-        simpa using hL 1
+        exact Std.HashSet.mem_iff_contains.mp (by simpa using hL 1)
       · show (⟨p, (win (m + 1) t.left).tail ++ [t.left.getD (m + 1) false],
           (win (m + 1) t.left).headD false, t.head :: (win (m + 1) t.right).dropLast⟩ : Loc) =
           ⟨p, win (m + 1) t.left.tail, t.left.headD false, win (m + 1) (t.head :: t.right)⟩
@@ -163,12 +164,12 @@ theorem Rep.step {m : Nat} {S : List Loc} {LS RS : List (List Bool)} (hc : close
       | zero =>
         simp only [List.drop_zero]
         rw [win_cons]
-        simpa [gramOK] using hgram
+        exact Std.HashSet.mem_iff_contains.mpr (by simpa [gramOK] using hgram)
       | succ j =>
         rw [win_cons_drop]
         exact hR j
 
-theorem Rep.diverges {m : Nat} {S : List Loc} {LS RS : List (List Bool)}
+theorem Rep.diverges {m : Nat} {S : Std.HashSet Loc} {LS RS : Std.HashSet (List Bool)}
     (hc : closed S LS RS = true) {c : Machine Zipper} (h : Rep m S LS RS c) : c⇑ := by
   intro k
   induction k generalizing c with
@@ -180,32 +181,67 @@ theorem Rep.diverges {m : Nat} {S : List Loc} {LS RS : List (List Bool)}
 
 def zeros (m : Nat) : List Bool := List.replicate (m + 1) false
 
-abbrev State : Type := List Loc × List (List Bool) × List (List Bool)
-
-def grow : Nat → State → State
-  | 0,        st          => st
-  | fuel + 1, (S, LS, RS) =>
-    let S' : List Loc := S.foldl (fun (acc : List Loc) (s : Loc) =>
-      (succs LS RS s).foldl (fun (a : List Loc) (x : Loc) => a.insert x) acc) S
-    let LS' : List (List Bool) := S.foldl (fun (acc : List (List Bool)) (s : Loc) =>
+/-- Semi-naive fixpoint growth on hash sets: each round expands only newly added states, plus
+previously seen moving states whose side's window set just grew. -/
+def grow (m fuel : Nat) (q : Program) :
+    Option (Std.HashSet Loc × Std.HashSet (List Bool) × Std.HashSet (List Bool)) := Id.run do
+  let z := zeros m
+  let init : Loc := ⟨q, z, false, z⟩
+  if !init.prog.alive then return none
+  let mut S  : Std.HashSet Loc := (∅ : Std.HashSet Loc).insert init
+  let mut LS : Std.HashSet (List Bool) := (∅ : Std.HashSet (List Bool)).insert z
+  let mut RS : Std.HashSet (List Bool) := (∅ : Std.HashSet (List Bool)).insert z
+  let mut new    : Array Loc := #[init]
+  let mut lefts  : Array Loc := #[]
+  let mut rights : Array Loc := #[]
+  let mut lsGrew := false
+  let mut rsGrew := false
+  for _ in [0:fuel] do
+    let mut added : Array Loc := #[]
+    for s in new do
+      for x in succs LS RS s do
+        if !x.prog.alive then return none
+        if !S.contains x then
+          S := S.insert x
+          added := added.push x
+    if lsGrew then
+      for s in lefts do
+        for x in succs LS RS s do
+          if !x.prog.alive then return none
+          if !S.contains x then
+            S := S.insert x
+            added := added.push x
+    if rsGrew then
+      for s in rights do
+        for x in succs LS RS s do
+          if !x.prog.alive then return none
+          if !S.contains x then
+            S := S.insert x
+            added := added.push x
+    let lsPrev := LS.size
+    let rsPrev := RS.size
+    for s in new do
       match s.prog with
-      | .right _ => acc.insert (s.head :: s.left.dropLast)
-      | _        => acc) LS
-    let RS' : List (List Bool) := S.foldl (fun (acc : List (List Bool)) (s : Loc) =>
-      match s.prog with
-      | .left _ => acc.insert (s.head :: s.right.dropLast)
-      | _       => acc) RS
-    if (S'.length = S.length ∧ LS'.length = LS.length ∧ RS'.length = RS.length) ∨
-        S'.any (fun (s : Loc) => !s.prog.alive) ∨ 5000 < S'.length
-    then (S', LS', RS')
-    else grow fuel (S', LS', RS')
+      | .right _ => LS := LS.insert (s.head :: s.left.dropLast); rights := rights.push s
+      | .left _  => RS := RS.insert (s.head :: s.right.dropLast); lefts := lefts.push s
+      | _        => pure ()
+    lsGrew := LS.size != lsPrev
+    rsGrew := RS.size != rsPrev
+    if added.isEmpty && !lsGrew && !rsGrew then
+      return some (S, LS, RS)
+    if 5000 < S.size then
+      return none
+    new := added
+  return none
 
 def check (m fuel : Nat) (q : Program) : Bool :=
-  let st := grow fuel ([⟨q, zeros m, false, zeros m⟩], [zeros m], [zeros m])
-  closed st.1 st.2.1 st.2.2 && decide ((⟨q, zeros m, false, zeros m⟩ : Loc) ∈ st.1) &&
-    decide (zeros m ∈ st.2.1) && decide (zeros m ∈ st.2.2)
+  let z := zeros m
+  let init : Loc := ⟨q, z, false, z⟩
+  match grow m fuel q with
+  | some (S, LS, RS) => closed S LS RS && S.contains init && LS.contains z && RS.contains z
+  | none => false
 
-theorem rep_init {m : Nat} {q : Program} {S : List Loc} {LS RS : List (List Bool)}
+theorem rep_init {m : Nat} {q : Program} {S : Std.HashSet Loc} {LS RS : Std.HashSet (List Bool)}
     (h0 : (⟨q, zeros m, false, zeros m⟩ : Loc) ∈ S) (hl : zeros m ∈ LS) (hr : zeros m ∈ RS) :
     Rep m S LS RS (q.init Zipper) := by
   refine ⟨?_, fun (k : Nat) => ?_, fun (k : Nat) => ?_⟩
@@ -224,9 +260,16 @@ theorem rep_init {m : Nat} {q : Program} {S : List Loc} {LS RS : List (List Bool
 theorem check_sound {m fuel : Nat} {q : Program} :
     check m fuel q = true → q⇑ := by
   intro h
-  simp only [check, Bool.and_eq_true, decide_eq_true_eq] at h
-  obtain ⟨⟨⟨hc, h0⟩, hl⟩, hr⟩ := h
-  exact Program.diverges_of (Rep.diverges hc (rep_init h0 hl hr))
+  unfold check at h
+  dsimp only at h
+  split at h
+  · simp only [Bool.and_eq_true] at h
+    obtain ⟨⟨⟨hc, h0⟩, hl⟩, hr⟩ := h
+    exact Program.diverges_of (Rep.diverges hc (rep_init
+      (Std.HashSet.mem_iff_contains.mpr h0)
+      (Std.HashSet.mem_iff_contains.mpr hl)
+      (Std.HashSet.mem_iff_contains.mpr hr)))
+  · cases h
 
 end Windows
 
