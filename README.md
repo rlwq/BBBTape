@@ -37,7 +37,7 @@ For the full write-up and explanation of the formalisation, Tree Normal Form sea
 - `BBBTape/Solved/` — hand-written non-halting proofs for individual programs no decider handles, grouped by size
 - `BBBTape/Expanders/` — Tree Normal Form expander (`TNF` / `Φ₁`)
 - `BBBTape/Macro/` — `bf"..."` syntax macro
-- `BBBTape/Results/` — proved theorems `bb0` through `bb18`
+- `BBBTape/Results/` — proved theorems `bb1` through `bb18`
 
 ## Verify locally
 
