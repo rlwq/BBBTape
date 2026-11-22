@@ -10,8 +10,57 @@ concurrency:
   group: lean-ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SHARDS: 8
+
 jobs:
-  build:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache elan toolchains
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan/toolchains
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
+
+      - name: Install elan
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Build this shard's results
+        run: |
+          mods=()
+          i=0
+          for f in $(find BBBTape/Results -name '*.lean' ! -name Frontier.lean | sort -V); do
+            base="${f%.lean}"
+            [ -d "$base" ] && continue
+            if [ $((i % SHARDS)) -eq ${{ matrix.shard }} ]; then
+              mods+=("$(echo "$base" | tr '/' '.')")
+            fi
+            i=$((i + 1))
+          done
+          echo "${mods[@]}"
+          lake build "${mods[@]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.shard }}
+          path: |
+            .lake/build/lib/lean/BBBTape/Results
+            .lake/build/lib/lean/BBBTape_BBBTape_Results_*
+            .lake/build/ir/BBBTape/Results
+          retention-days: 1
+          include-hidden-files: true
+
+  check:
+    needs: shard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +75,12 @@ jobs:
         run: |
           curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: .lake/build
+          merge-multiple: true
 
       - name: Build and verify all proofs
         run: lake build

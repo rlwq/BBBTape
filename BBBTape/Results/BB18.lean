@@ -74,9 +74,7 @@ theorem BB18.parts : ∀ j, j < 32 → ∀ q ∈ part j, Bounded 12202 q := by
   | j + 32, h => exact absurd h (by omega)
 
 theorem bb18 : IsBB 18 12202 :=
-  IsBB.of_bounded (e := Φ₁) (d := Ξ₆)
-    (.flip (.left (.flip (.loop (.left (.flip (.loop (.left (.left (.flip (.loop (.right .nil)
-      (.flip (.right .nil)))))) (.left .nil)))) .nil)))) (by native_decide)
+  IsBB.of_bounded (e := Φ₁) (d := Ξ₆) (.flip (.left (.flip (.loop (.left (.flip (.loop (.left (.left (.flip (.loop (.right .nil) (.flip (.right .nil)))))) (.left .nil)))) .nil)))) (by native_decide)
     (by simp [Program.Closed]) (by decide)
     (bounded_of_hashParts (e := Φ₁) (d := Ξ₆) 3 (by decide) rfl BB18.parts)
 
