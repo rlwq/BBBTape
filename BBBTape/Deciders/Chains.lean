@@ -2,6 +2,8 @@ import BBBTape.Deciders.Simulator
 import BBBTape.Deciders.Windows
 import BBBTape.Deciders.Translated
 import BBBTape.Deciders.Blocks
+import BBBTape.Solved.BB18.LeftCounter
+import BBBTape.Solved.BB18.RightCounter
 
 namespace BBBTape
 
@@ -30,5 +32,9 @@ def Ξ₅ : Decider :=
   Ξ₄ <|> .phased 3 2 200 <|> .simulator WordTape 1000 <|>
     .blocks 2 3 20000 <|> .blocks 3 2 20000 <|> .blocks 3 3 20000 <|> .blocks 5 2 20000 <|>
     .blocks 6 2 20000 <|> .blocks 8 2 20000 <|> .windows 16 3000
+
+def Ξ₆ : Decider :=
+  Ξ₅ <|> .leftCounter <|> .rightCounter <|> .simulator WordTape 15000 <|> .phased 2 4 3000 <|>
+    .blocks 2 5 20000 <|> .blocks 6 4 20000 <|> .translatedUpTo 20000 400
 
 end BBBTape

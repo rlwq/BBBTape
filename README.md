@@ -27,15 +27,17 @@ For the full write-up and explanation of the formalisation, Tree Normal Form sea
 | 15 | 1,387,247,580 | 276 | `*[[<*[>>>]<]<<]` |
 | 16 | 6,363,044,315 | 352 | `*[<<*[[>>>]*>]<]` |
 | 17 | 29,323,149,825 | 871 | `*[[<*<*[>]>]<*<<]` |
+| 18 | 135,700,543,190 | 12,202 | `*<*[<*[<<*[>]*>]<]` |
 
 ## Structure
 
 - `BBBTape/Core/` — language AST, tape interface, operational semantics, Busy Beaver statement, refinement, decider/expander interfaces, and TNF search
 - `BBBTape/Tapes/` — concrete tape implementations (`Spec`, `Zipper`, `WordTape`)
-- `BBBTape/Deciders/` — sound deciders (`Simulator`, `Windows`, `Translated`, `Blocks`) and decider chains (`Ξ₁` … `Ξ₅`)
+- `BBBTape/Deciders/` — sound deciders (`Simulator`, `Windows`, `Translated`, `Blocks`) and decider chains (`Ξ₁` … `Ξ₆`)
+- `BBBTape/Solved/` — hand-written non-halting proofs for individual programs no decider handles, grouped by size
 - `BBBTape/Expanders/` — Tree Normal Form expander (`TNF` / `Φ₁`)
 - `BBBTape/Macro/` — `bf"..."` syntax macro
-- `BBBTape/Results/` — proved theorems `bb0` through `bb17`
+- `BBBTape/Results/` — proved theorems `bb0` through `bb18`
 
 ## Verify locally
 
