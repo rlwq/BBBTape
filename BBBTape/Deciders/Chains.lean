@@ -21,9 +21,14 @@ def Ξ₃ : Decider :=
 def Ξ₄ : Decider :=
   Decider.simulator WordTape 400 <|>
     Ξ₃ <|>
-    .windows2 1 200 <|> .windows2 3 200 <|>
+    .phased 2 1 200 <|> .phased 2 3 200 <|>
     .windows 6 500 <|> .windows 7 500 <|> .windows 8 500 <|> .windows 13 1500 <|>
     .blocks 6 2 2000 <|> .translated 2000 150 <|> .translated 2000 160 <|>
     .translated 5000 145 <|> .translated 5000 171
+
+def Ξ₅ : Decider :=
+  Ξ₄ <|> .phased 3 2 200 <|> .simulator WordTape 1000 <|>
+    .blocks 2 3 20000 <|> .blocks 3 2 20000 <|> .blocks 3 3 20000 <|> .blocks 5 2 20000 <|>
+    .blocks 6 2 20000 <|> .blocks 8 2 20000 <|> .windows 16 3000
 
 end BBBTape
