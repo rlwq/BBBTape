@@ -4,3 +4,7 @@ defaultTargets = ["BBBTape"]
 [[lean_lib]]
 name = "BBBTape"
 precompileModules = true
+
+[[lean_exe]]
+name = "bench"
+root = "Bench"
